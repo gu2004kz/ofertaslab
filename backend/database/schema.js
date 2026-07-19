@@ -235,7 +235,7 @@ async function initializeDatabase() {
 
 async function seedDefaultData() {
   const configCount = await getOne('SELECT COUNT(*) as count FROM configuracoes');
-  if (configCount.count === 0) {
+  if (parseInt(configCount.count) === 0) {
     const configs = [
       ['modo_publicacao', 'automatico', 'Modo de publicação: automatico ou manual'],
       ['desconto_minimo', '10', 'Desconto mínimo para capturar ofertas'],
@@ -260,7 +260,7 @@ async function seedDefaultData() {
   }
 
   const catCount = await getOne('SELECT COUNT(*) as count FROM categorias');
-  if (catCount.count === 0) {
+  if (parseInt(catCount.count) === 0) {
     const categorias = [
       ['Eletrônicos', 'eletronicos', '💻'],
       ['Celulares', 'celulares', '📱'],
@@ -284,7 +284,7 @@ async function seedDefaultData() {
   }
 
   const userCount = await getOne('SELECT COUNT(*) as count FROM usuarios');
-  if (userCount.count === 0) {
+  if (parseInt(userCount.count) === 0) {
     const hash = bcrypt.hashSync('admin123', 10);
     await runQuery('INSERT INTO usuarios (nome, email, senha, role) VALUES (?, ?, ?, ?)', ['Administrador', 'admin@ofertaslab.com', hash, 'admin']);
   }
