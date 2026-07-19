@@ -1,11 +1,12 @@
 const API = {
   token: localStorage.getItem('ofertaslab_token'),
+  baseUrl: 'https://ofertaslab.onrender.com',
 
   async request(url, options = {}) {
     const headers = { 'Content-Type': 'application/json', ...options.headers };
     if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
     try {
-      const response = await fetch(`/api${url}`, { ...options, headers });
+      const response = await fetch(`${this.baseUrl}/api${url}`, { ...options, headers });
       if (response.status === 401) { this.logout(); return null; }
       if (response.headers.get('content-type')?.includes('text/csv')) {
         return await response.blob();

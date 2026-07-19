@@ -3,18 +3,6 @@
   command = "echo 'ok'"
 
 [[redirects]]
-  from = "/api/*"
-  to = "https://ofertaslab.onrender.com/api/*"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/go/*"
-  to = "https://ofertaslab.onrender.com/go/*"
-  status = 302
-  force = true
-
-[[redirects]]
   from = "/login"
   to = "/pages/login.html"
   status = 200
