@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OFERTASLAB - Afiliados</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0a0a0f">
+</head>
+<body>
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header"><div class="sidebar-logo">&#9889;</div><span class="sidebar-title">OFERTASLAB</span></div>
+    <div class="sidebar-nav"></div>
+    <div class="sidebar-footer"><button class="sidebar-toggle">&#9664; <span class="sidebar-footer-text">Recolher</span></button></div>
+  </nav>
+
+  <main class="main-content">
+    <header class="header">
+      <div class="header-left"><h1 class="header-title">Afiliados</h1></div>
+      <div class="header-right"><button class="btn btn-primary" data-modal="modalNovoAfiliado">+ Novo Afiliado</button></div>
+    </header>
+
+    <div class="page-content">
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+        <div class="stat-card"><div class="stat-icon">&#127992;</div><div class="stat-value" id="statShopee">-</div><div class="stat-label">Afiliados Shopee</div></div>
+        <div class="stat-card"><div class="stat-icon">&#127993;</div><div class="stat-value" id="statML">-</div><div class="stat-label">Afiliados ML</div></div>
+        <div class="stat-card"><div class="stat-icon">&#9989;</div><div class="stat-value" id="statAtivos">-</div><div class="stat-label">Ativos</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Contas de Afiliado</h3></div>
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Plataforma</th><th>Conta</th><th>Affiliate ID</th><th>API Key</th><th>Status</th><th>Cadastro</th><th>Acoes</th></tr></thead>
+            <tbody id="tabelaAfiliados"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Configuracao de Afiliados</h3></div>
+        <div class="text-sm text-muted" style="line-height:1.8">
+          <p><strong>Shopee:</strong> Cadastre seu affiliate_id e API key nas configuracoes. O sistema converte automaticamente os links.</p>
+          <p><strong>Mercado Livre:</strong> Cadastre seu App ID e Secret Key. A conversao de links e automatica.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal-overlay" id="modalNovoAfiliado">
+    <div class="modal">
+      <div class="modal-header"><h2 class="modal-title">Novo Afiliado</h2><button class="modal-close">&#10005;</button></div>
+      <form id="formAfiliado">
+        <div class="grid-2">
+          <div class="form-group"><label>Plataforma *</label><select class="form-control" id="afPlataforma" required><option value="shopee">Shopee</option><option value="mercadolivre">Mercado Livre</option></select></div>
+          <div class="form-group"><label>Conta *</label><input type="text" class="form-control" id="afConta" required></div>
+        </div>
+        <div class="form-group"><label>Affiliate ID</label><input type="text" class="form-control" id="afAffiliateId"></div>
+        <div class="grid-2">
+          <div class="form-group"><label>API Key</label><input type="text" class="form-control" id="afApiKey"></div>
+          <div class="form-group"><label>API Secret</label><input type="password" class="form-control" id="afApiSecret"></div>
+        </div>
+        <button type="submit" class="btn btn-primary w-full" style="justify-content:center;margin-top:8px;">Cadastrar</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/assets/js/app.js"></script>
+  <script src="/assets/js/layout.js"></script>
+  <script>
+    renderLayout('/afiliados');
+
+    async function loadAfiliados() {
+      const afiliados = await API.get('/afiliados') || [];
+      document.getElementById('statShopee').textContent = afiliados.filter(a => a.plataforma === 'shopee').length;
+      document.getElementById('statML').textContent = afiliados.filter(a => a.plataforma === 'mercadolivre').length;
+      document.getElementById('statAtivos').textContent = afiliados.filter(a => a.ativo).length;
+      const tbody = document.getElementById('tabelaAfiliados');
+      if (!afiliados.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding:30px">Nenhum afiliado cadastrado</td></tr>'; return; }
+      tbody.innerHTML = afiliados.map(a => '<tr><td><span class="tag">' + (a.plataforma === 'shopee' ? 'Shopee' : 'Mercado Livre') + '</span></td><td>' + a.conta + '</td><td><code style="font-size:12px">' + (a.affiliate_id || '-') + '</code></td><td><code style="font-size:12px">' + (a.api_key ? '****' + a.api_key.slice(-4) : '-') + '</code></td><td><span class="badge ' + (a.ativo ? 'badge-success' : 'badge-danger') + '">' + (a.ativo ? 'Ativo' : 'Inativo') + '</span></td><td class="text-sm text-muted">' + Utils.formatDate(a.criado_em) + '</td><td><button class="btn btn-danger btn-sm" onclick="excluirAfiliado(' + a.id + ')">Del</button></td></tr>').join('');
+    }
+
+    async function excluirAfiliado(id) {
+      if (!confirm('Excluir?')) return;
+      await API.delete('/afiliados/' + id);
+      Toast.success('Excluido');
+      loadAfiliados();
+    }
+
+    document.getElementById('formAfiliado').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await API.post('/afiliados', {
+        plataforma: document.getElementById('afPlataforma').value, conta: document.getElementById('afConta').value,
+        affiliate_id: document.getElementById('afAffiliateId').value, api_key: document.getElementById('afApiKey').value,
+        api_secret: document.getElementById('afApiSecret').value
+      });
+      Toast.success('Cadastrado!');
+      closeModal('modalNovoAfiliado');
+      e.target.reset();
+      loadAfiliados();
+    });
+
+    loadAfiliados();
+  </script>
+</body>
+</html>

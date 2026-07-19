@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OFERTASLAB - Telegram</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0a0a0f">
+</head>
+<body>
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header"><div class="sidebar-logo">&#9889;</div><span class="sidebar-title">OFERTASLAB</span></div>
+    <div class="sidebar-nav"></div>
+    <div class="sidebar-footer"><button class="sidebar-toggle">&#9664; <span class="sidebar-footer-text">Recolher</span></button></div>
+  </nav>
+
+  <main class="main-content">
+    <header class="header">
+      <div class="header-left"><h1 class="header-title">Telegram</h1></div>
+      <div class="header-right"><button class="btn btn-primary" data-modal="modalNovoCanal">+ Novo Canal</button></div>
+    </header>
+
+    <div class="page-content">
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+        <div class="stat-card"><div class="stat-icon">&#128225;</div><div class="stat-value" id="statCanais">-</div><div class="stat-label">Canais Ativos</div></div>
+        <div class="stat-card"><div class="stat-icon">&#128228;</div><div class="stat-value" id="statPublicacoes">-</div><div class="stat-label">Publicacoes Hoje</div></div>
+        <div class="stat-card"><div class="stat-icon">&#9888;</div><div class="stat-value" id="statErros">-</div><div class="stat-label">Erros</div></div>
+      </div>
+
+      <div class="card mb-24">
+        <div class="card-header"><h3 class="card-title">Canais Telegram</h3></div>
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Nome</th><th>ID do Canal</th><th>Horario</th><th>Intervalo</th><th>Enviados Hoje</th><th>Limite</th><th>Status</th><th>Acoes</th></tr></thead>
+            <tbody id="tabelaCanais"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Historico de Publicacoes</h3></div>
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Produto</th><th>Canal</th><th>Desconto</th><th>Status</th><th>Data</th></tr></thead>
+            <tbody id="tabelaPublicacoes"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal-overlay" id="modalNovoCanal">
+    <div class="modal">
+      <div class="modal-header"><h2 class="modal-title">Novo Canal Telegram</h2><button class="modal-close">&#10005;</button></div>
+      <form id="formCanal">
+        <div class="form-group"><label>Nome do Canal *</label><input type="text" class="form-control" id="canalNome" placeholder="Canal de Ofertas" required></div>
+        <div class="form-group"><label>ID do Canal *</label><input type="text" class="form-control" id="canalId" placeholder="-1001234567890" required></div>
+        <div class="form-group"><label>Token do Bot *</label><input type="text" class="form-control" id="canalToken" placeholder="123456789:ABCdef..." required></div>
+        <div class="grid-2">
+          <div class="form-group"><label>Horario Inicio</label><input type="time" class="form-control" id="canalInicio" value="08:00"></div>
+          <div class="form-group"><label>Horario Fim</label><input type="time" class="form-control" id="canalFim" value="23:00"></div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label>Intervalo (min)</label><input type="number" class="form-control" id="canalIntervalo" value="15" min="1"></div>
+          <div class="form-group"><label>Limite Diario</label><input type="number" class="form-control" id="canalLimite" value="50" min="1"></div>
+        </div>
+        <button type="submit" class="btn btn-primary w-full" style="justify-content:center;margin-top:8px;">Criar Canal</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/assets/js/app.js"></script>
+  <script src="/assets/js/layout.js"></script>
+  <script>
+    renderLayout('/telegram');
+
+    async function loadCanais() {
+      const canais = await API.get('/telegram/canais') || [];
+      document.getElementById('statCanais').textContent = canais.filter(c => c.ativo).length;
+      const tbody = document.getElementById('tabelaCanais');
+      if (!canais.length) { tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted" style="padding:30px">Nenhum canal configurado</td></tr>'; return; }
+      tbody.innerHTML = canais.map(c => '<tr><td><strong>' + c.nome + '</strong></td><td><code style="font-size:12px;color:var(--text-muted)">' + c.canal_id + '</code></td><td>' + c.horario_inicio + ' - ' + c.horario_fim + '</td><td>' + c.intervalo_minutos + 'min</td><td>' + (c.mensagens_enviadas_hoje || 0) + '</td><td>' + c.limite_diario + '</td><td><span class="badge ' + (c.ativo ? 'badge-success' : 'badge-danger') + '">' + (c.ativo ? 'Ativo' : 'Inativo') + '</span></td><td><div class="flex gap-8"><button class="btn btn-outline btn-sm" onclick="testarBot(' + c.id + ')">Testar</button><button class="btn btn-danger btn-sm" onclick="excluirCanal(' + c.id + ')">Del</button></div></td></tr>').join('');
+    }
+
+    async function loadPublicacoes() {
+      const pubs = await API.get('/telegram/publicacoes') || [];
+      const hoje = new Date().toDateString();
+      document.getElementById('statPublicacoes').textContent = pubs.filter(p => new Date(p.enviada_em).toDateString() === hoje).length;
+      document.getElementById('statErros').textContent = pubs.filter(p => p.status === 'erro').length;
+      const tbody = document.getElementById('tabelaPublicacoes');
+      if (!pubs.length) { tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted" style="padding:30px">Nenhuma publicacao</td></tr>'; return; }
+      tbody.innerHTML = pubs.slice(0, 50).map(p => '<tr><td>' + p.produto + '</td><td>' + p.canal_nome + '</td><td><span class="badge badge-success">' + p.desconto + '%</span></td><td><span class="badge ' + (p.status === 'enviada' ? 'badge-success' : 'badge-danger') + '">' + p.status + '</span></td><td class="text-sm text-muted">' + Utils.timeAgo(p.enviada_em) + '</td></tr>').join('');
+    }
+
+    async function testarBot(id) {
+      const r = await API.post('/telegram/testar-bot/' + id, {});
+      if (r) Toast.success('Bot testado!');
+      else Toast.error('Erro ao testar');
+    }
+
+    async function excluirCanal(id) {
+      if (!confirm('Excluir canal?')) return;
+      await API.delete('/telegram/canais/' + id);
+      Toast.success('Canal excluido');
+      loadCanais();
+    }
+
+    document.getElementById('formCanal').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await API.post('/telegram/canais', {
+        nome: document.getElementById('canalNome').value, canal_id: document.getElementById('canalId').value,
+        bot_token: document.getElementById('canalToken').value, horario_inicio: document.getElementById('canalInicio').value,
+        horario_fim: document.getElementById('canalFim').value, intervalo_minutos: document.getElementById('canalIntervalo').value,
+        limite_diario: document.getElementById('canalLimite').value
+      });
+      Toast.success('Canal criado!');
+      closeModal('modalNovoCanal');
+      e.target.reset();
+      loadCanais();
+    });
+
+    loadCanais();
+    loadPublicacoes();
+  </script>
+</body>
+</html>

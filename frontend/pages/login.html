@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OFERTASLAB - Login</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0a0a0f">
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-box">
+      <h1>OFERTASLAB</h1>
+      <p class="subtitle">Plataforma de Ofertas Automatizadas</p>
+      <form id="loginForm">
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" class="form-control" id="email" placeholder="seu@email.com" required>
+        </div>
+        <div class="form-group">
+          <label>Senha</label>
+          <input type="password" class="form-control" id="senha" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn btn-primary w-full" style="margin-top:16px;justify-content:center;">Entrar</button>
+      </form>
+      <p style="text-align:center;margin-top:20px;font-size:12px;color:var(--text-muted);">Credenciais: admin@ofertaslab.com / admin123</p>
+    </div>
+  </div>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    if (API.token) { window.location.href = '/'; }
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const senha = document.getElementById('senha').value;
+      const btn = e.target.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.textContent = 'Entrando...';
+      const data = await API.post('/auth/login', { email, senha });
+      if (data && data.token) {
+        API.setToken(data.token);
+        Toast.success('Login realizado!');
+        setTimeout(() => window.location.href = '/', 300);
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Entrar';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OFERTASLAB - Analytics</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0a0a0f">
+</head>
+<body>
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header"><div class="sidebar-logo">&#9889;</div><span class="sidebar-title">OFERTASLAB</span></div>
+    <div class="sidebar-nav"></div>
+    <div class="sidebar-footer"><button class="sidebar-toggle">&#9664; <span class="sidebar-footer-text">Recolher</span></button></div>
+  </nav>
+
+  <main class="main-content">
+    <header class="header">
+      <div class="header-left"><h1 class="header-title">Analytics</h1></div>
+      <div class="header-right">
+        <select class="form-control" id="periodoAnalytics" style="width:160px">
+          <option value="7d">Ultimos 7 dias</option>
+          <option value="30d" selected>Ultimos 30 dias</option>
+          <option value="90d">Ultimos 90 dias</option>
+        </select>
+        <button class="btn btn-outline" onclick="exportarCSV()">Exportar CSV</button>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+        <div class="stat-card"><div class="stat-icon">&#128070;</div><div class="stat-value" id="anCliques">-</div><div class="stat-label">Cliques</div></div>
+        <div class="stat-card"><div class="stat-icon">&#128722;</div><div class="stat-value" id="anVendas">-</div><div class="stat-label">Vendas</div></div>
+        <div class="stat-card"><div class="stat-icon">&#128176;</div><div class="stat-value" id="anReceita">-</div><div class="stat-label">Receita</div></div>
+        <div class="stat-card"><div class="stat-icon">&#128181;</div><div class="stat-value" id="anComissao">-</div><div class="stat-label">Comissao</div></div>
+        <div class="stat-card"><div class="stat-icon">&#127991;</div><div class="stat-value" id="anOfertas">-</div><div class="stat-label">Ofertas</div></div>
+        <div class="stat-card"><div class="stat-icon">&#128228;</div><div class="stat-value" id="anPubs">-</div><div class="stat-label">Publicacoes</div></div>
+      </div>
+
+      <div class="grid-2 mb-24">
+        <div class="card"><div class="card-header"><h3 class="card-title">Cliques por Dia</h3></div><div class="chart-container"><canvas id="anChartCliques"></canvas></div></div>
+        <div class="card"><div class="card-header"><h3 class="card-title">Vendas e Comissao</h3></div><div class="chart-container"><canvas id="anChartVendas"></canvas></div></div>
+      </div>
+      <div class="grid-2 mb-24">
+        <div class="card"><div class="card-header"><h3 class="card-title">Cliques por Canal</h3></div><div class="chart-container"><canvas id="anChartCanais"></canvas></div></div>
+        <div class="card"><div class="card-header"><h3 class="card-title">Por Plataforma</h3></div><div class="chart-container"><canvas id="anChartPlat"></canvas></div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Top Ofertas</h3></div>
+        <div class="table-container">
+          <table><thead><tr><th>#</th><th>Produto</th><th>Preco</th><th>Desconto</th><th>Cliques</th><th>Vendas</th></tr></thead><tbody id="tabelaTopOfertas"></tbody></table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script src="/assets/js/layout.js"></script>
+  <script>
+    renderLayout('/analytics');
+    let anCharts = {};
+
+    async function loadAnalytics() {
+      const periodo = document.getElementById('periodoAnalytics').value;
+      const data = await API.get('/analytics/resumo?periodo=' + periodo);
+      if (!data) return;
+      document.getElementById('anCliques').textContent = Utils.formatNumber(data.cliques);
+      document.getElementById('anVendas').textContent = Utils.formatNumber(data.vendas);
+      document.getElementById('anReceita').textContent = Utils.formatCurrency(data.receita);
+      document.getElementById('anComissao').textContent = Utils.formatCurrency(data.comissao);
+      document.getElementById('anOfertas').textContent = Utils.formatNumber(data.ofertas);
+      document.getElementById('anPubs').textContent = Utils.formatNumber(data.publicacoes);
+      renderAnCharts(data);
+      renderTopOfertas(data.topOfertas);
+    }
+
+    function renderAnCharts(data) {
+      Object.values(anCharts).forEach(c => c.destroy());
+      anCharts = {};
+      const d = { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#a0a0b8' } } }, scales: { x: { ticks: { color: '#6b6b80' }, grid: { color: 'rgba(255,255,255,0.05)' } }, y: { ticks: { color: '#6b6b80' }, grid: { color: 'rgba(255,255,255,0.05)' } } } };
+      if (data.cliquePorDia.length) anCharts.cliques = new Chart(document.getElementById('anChartCliques'), { type: 'line', data: { labels: data.cliquePorDia.map(x => x.data), datasets: [{ label: 'Cliques', data: data.cliquePorDia.map(x => x.total), borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.1)', fill: true, tension: 0.4 }] }, options: d });
+      if (data.vendasPorDia.length) anCharts.vendas = new Chart(document.getElementById('anChartVendas'), { type: 'bar', data: { labels: data.vendasPorDia.map(x => x.data), datasets: [{ label: 'Vendas', data: data.vendasPorDia.map(x => x.total), backgroundColor: 'rgba(59,130,246,0.6)' }, { label: 'Comissao', data: data.vendasPorDia.map(x => x.comissao), backgroundColor: 'rgba(16,185,129,0.6)' }] }, options: d });
+      if (data.cliquePorCanal.length) anCharts.canais = new Chart(document.getElementById('anChartCanais'), { type: 'doughnut', data: { labels: data.cliquePorCanal.map(x => x.nome), datasets: [{ data: data.cliquePorCanal.map(x => x.total), backgroundColor: ['#7c3aed','#3b82f6','#10b981','#f59e0b','#ef4444'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#a0a0b8' } } } } });
+      if (data.cliquePorPlataforma.length) anCharts.plat = new Chart(document.getElementById('anChartPlat'), { type: 'doughnut', data: { labels: data.cliquePorPlataforma.map(x => x.plataforma === 'shopee' ? 'Shopee' : 'ML'), datasets: [{ data: data.cliquePorPlataforma.map(x => x.total), backgroundColor: ['#ee4d2d','#fff159'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#a0a0b8' } } } } });
+    }
+
+    function renderTopOfertas(ofertas) {
+      const tbody = document.getElementById('tabelaTopOfertas');
+      if (!ofertas || !ofertas.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:30px">Nenhum dado</td></tr>'; return; }
+      tbody.innerHTML = ofertas.map((o, i) => '<tr><td>' + (i+1) + '</td><td>' + o.produto + '</td><td>' + Utils.formatCurrency(o.preco_novo) + '</td><td><span class="badge badge-success">' + o.desconto + '%</span></td><td>' + (o.cliques || 0) + '</td><td>' + (o.vendas || 0) + '</td></tr>').join('');
+    }
+
+    async function exportarCSV() {
+      const blob = await API.get('/analytics/exportar');
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'ofertaslab-' + new Date().toISOString().slice(0,10) + '.csv';
+      a.click();
+      Toast.success('CSV exportado!');
+    }
+
+    document.getElementById('periodoAnalytics').addEventListener('change', loadAnalytics);
+    loadAnalytics();
+  </script>
+</body>
+</html>

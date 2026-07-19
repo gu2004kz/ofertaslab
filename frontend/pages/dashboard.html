@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OFERTASLAB - Dashboard</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0a0a0f">
+</head>
+<body>
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">&#9889;</div>
+      <span class="sidebar-title">OFERTASLAB</span>
+    </div>
+    <div class="sidebar-nav"></div>
+    <div class="sidebar-footer">
+      <button class="sidebar-toggle">&#9664; <span class="sidebar-footer-text">Recolher</span></button>
+    </div>
+  </nav>
+
+  <main class="main-content">
+    <header class="header">
+      <div class="header-left"><h1 class="header-title">Dashboard</h1></div>
+      <div class="header-right">
+        <button class="header-btn" onclick="loadDashboard()" title="Atualizar">&#128260;</button>
+        <button class="header-btn" onclick="exportarRelatorio()" title="Exportar CSV">&#128229;</button>
+        <button class="header-btn" onclick="criarBackup()" title="Backup">&#128190;</button>
+        <button class="header-btn" onclick="API.logout()" title="Sair">&#128682;</button>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><div class="stat-icon">&#127991;</div><div class="stat-value" id="statOfertas">-</div><div class="stat-label">Total de Ofertas</div></div>
+        <div class="stat-card"><div class="stat-icon">&#128226;</div><div class="stat-value" id="statPublicadas">-</div><div class="stat-label">Publicadas</div></div>
+        <div class="stat-card"><div class="stat-icon">&#128070;</div><div class="stat-value" id="statCliques">-</div><div class="stat-label">Cliques Totais</div></div>
+        <div class="stat-card"><div class="stat-icon">&#128722;</div><div class="stat-value" id="statVendas">-</div><div class="stat-label">Vendas</div></div>
+        <div class="stat-card"><div class="stat-icon">&#128176;</div><div class="stat-value" id="statComissao">-</div><div class="stat-label">Comissao Total</div></div>
+        <div class="stat-card"><div class="stat-icon">&#128197;</div><div class="stat-value" id="statComissaoMes">-</div><div class="stat-label">Comissao do Mes</div></div>
+        <div class="stat-card"><div class="stat-icon">&#128101;</div><div class="stat-value" id="statMembros">-</div><div class="stat-label">Membros Telegram</div></div>
+        <div class="stat-card"><div class="stat-icon">&#128200;</div><div class="stat-value" id="statConversao">-</div><div class="stat-label">Conversao</div></div>
+      </div>
+
+      <div class="grid-2 mb-24">
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Cliques por Dia</h3></div>
+          <div class="chart-container"><canvas id="chartCliques"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Comissao por Dia</h3></div>
+          <div class="chart-container"><canvas id="chartComissao"></canvas></div>
+        </div>
+      </div>
+
+      <div class="grid-2 mb-24">
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Por Plataforma</h3></div>
+          <div class="chart-container"><canvas id="chartPlataforma"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Por Status</h3></div>
+          <div class="chart-container"><canvas id="chartStatus"></canvas></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Mais Clicados</h3></div>
+          <div id="topProdutos" style="max-height:300px;overflow-y:auto;"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Mais Vendidos</h3></div>
+          <div id="topVendas" style="max-height:300px;overflow-y:auto;"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script src="/assets/js/layout.js"></script>
+  <script>
+    renderLayout('/');
+    let charts = {};
+
+    async function loadDashboard() {
+      const data = await API.get('/dashboard');
+      if (!data) return;
+      document.getElementById('statOfertas').textContent = Utils.formatNumber(data.stats.totalOfertas);
+      document.getElementById('statPublicadas').textContent = Utils.formatNumber(data.stats.ofertasPublicadas);
+      document.getElementById('statCliques').textContent = Utils.formatNumber(data.stats.totalCliques);
+      document.getElementById('statVendas').textContent = Utils.formatNumber(data.stats.totalVendas);
+      document.getElementById('statComissao').textContent = Utils.formatCurrency(data.stats.comissaoTotal);
+      document.getElementById('statComissaoMes').textContent = Utils.formatCurrency(data.stats.comissaoMes);
+      document.getElementById('statMembros').textContent = Utils.formatNumber(data.stats.totalMembros);
+      document.getElementById('statConversao').textContent = data.stats.conversao + '%';
+      renderCharts(data);
+      renderTopProdutos(data.topProdutos);
+      renderTopVendas(data.topVendas);
+    }
+
+    function renderCharts(data) {
+      Object.values(charts).forEach(c => c.destroy());
+      charts = {};
+      const defs = { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#a0a0b8' } } }, scales: { x: { ticks: { color: '#6b6b80' }, grid: { color: 'rgba(255,255,255,0.05)' } }, y: { ticks: { color: '#6b6b80' }, grid: { color: 'rgba(255,255,255,0.05)' } } } };
+
+      if (data.cliquePorDia.length) {
+        charts.cliques = new Chart(document.getElementById('chartCliques'), { type: 'line', data: { labels: data.cliquePorDia.map(d => d.data), datasets: [{ label: 'Cliques', data: data.cliquePorDia.map(d => d.total), borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.1)', fill: true, tension: 0.4 }] }, options: defs });
+      }
+      if (data.comissaoPorDia.length) {
+        charts.comissao = new Chart(document.getElementById('chartComissao'), { type: 'bar', data: { labels: data.comissaoPorDia.map(d => d.data), datasets: [{ label: 'Comissao', data: data.comissaoPorDia.map(d => d.total), backgroundColor: 'rgba(16,185,129,0.6)' }] }, options: defs });
+      }
+      if (data.ofertasPorPlataforma.length) {
+        charts.plat = new Chart(document.getElementById('chartPlataforma'), { type: 'doughnut', data: { labels: data.ofertasPorPlataforma.map(p => p.plataforma === 'shopee' ? 'Shopee' : 'Mercado Livre'), datasets: [{ data: data.ofertasPorPlataforma.map(p => p.total), backgroundColor: ['#ee4d2d', '#fff159'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#a0a0b8' } } } } });
+      }
+      if (data.ofertasPorStatus.length) {
+        const sc = { pendente: '#f59e0b', aprovada: '#3b82f6', publicada: '#10b981', rejeitada: '#ef4444', expirada: '#6b6b80' };
+        charts.status = new Chart(document.getElementById('chartStatus'), { type: 'doughnut', data: { labels: data.ofertasPorStatus.map(s => s.status), datasets: [{ data: data.ofertasPorStatus.map(s => s.total), backgroundColor: data.ofertasPorStatus.map(s => sc[s.status] || '#6b6b80'), borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#a0a0b8' } } } } });
+      }
+    }
+
+    function renderTopProdutos(p) {
+      const c = document.getElementById('topProdutos');
+      if (!p || !p.length) { showEmpty(c, 'Nenhum clique'); return; }
+      c.innerHTML = p.map((x, i) => '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-glass)"><span style="color:var(--text-muted);width:24px">#' + (i+1) + '</span><div style="flex:1"><div style="font-weight:500;font-size:14px">' + x.produto + '</div><div style="font-size:12px;color:var(--text-muted)">' + x.cliques + ' cliques</div></div></div>').join('');
+    }
+
+    function renderTopVendas(v) {
+      const c = document.getElementById('topVendas');
+      if (!v || !v.length) { showEmpty(c, 'Nenhuma venda'); return; }
+      c.innerHTML = v.map((x, i) => '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-glass)"><span style="color:var(--text-muted);width:24px">#' + (i+1) + '</span><div style="flex:1"><div style="font-weight:500;font-size:14px">' + x.produto + '</div><div style="font-size:12px;color:var(--text-muted)">' + x.vendas + ' vendas - ' + Utils.formatCurrency(x.valor_total) + '</div></div></div>').join('');
+    }
+
+    async function exportarRelatorio() {
+      const blob = await API.get('/analytics/exportar');
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'ofertaslab-relatorio-' + new Date().toISOString().slice(0,10) + '.csv';
+      a.click();
+      Toast.success('Relatorio exportado!');
+    }
+
+    async function criarBackup() {
+      const data = await API.get('/config/backup');
+      if (data) Toast.success('Backup: ' + data.arquivo);
+    }
+
+    loadDashboard();
+    setInterval(loadDashboard, 30000);
+  </script>
+</body>
+</html>

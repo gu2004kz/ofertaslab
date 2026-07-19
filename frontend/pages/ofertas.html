@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OFERTASLAB - Ofertas</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0a0a0f">
+</head>
+<body>
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">&#9889;</div>
+      <span class="sidebar-title">OFERTASLAB</span>
+    </div>
+    <div class="sidebar-nav"></div>
+    <div class="sidebar-footer">
+      <button class="sidebar-toggle">&#9664; <span class="sidebar-footer-text">Recolher</span></button>
+    </div>
+  </nav>
+
+  <main class="main-content">
+    <header class="header">
+      <div class="header-left"><h1 class="header-title">Ofertas</h1></div>
+      <div class="header-right">
+        <button class="btn btn-primary" data-modal="modalNovaOferta">+ Nova Oferta</button>
+        <button class="btn btn-outline" onclick="aprovarTodas()">Aprovar Todas</button>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <div class="filters-bar">
+        <input type="text" class="form-control search-input" id="buscaOferta" placeholder="Buscar ofertas...">
+        <select class="form-control" id="filtroStatus" style="max-width:160px;">
+          <option value="">Todos Status</option>
+          <option value="pendente">Pendente</option>
+          <option value="aprovada">Aprovada</option>
+          <option value="publicada">Publicada</option>
+          <option value="rejeitada">Rejeitada</option>
+        </select>
+        <select class="form-control" id="filtroPlataforma" style="max-width:160px;">
+          <option value="">Todas</option>
+          <option value="shopee">Shopee</option>
+          <option value="mercadolivre">Mercado Livre</option>
+        </select>
+        <select class="form-control" id="filtroCategoria" style="max-width:160px;"></select>
+      </div>
+
+      <div class="card">
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Produto</th><th>Plataforma</th><th>Categoria</th><th>Preco Original</th><th>Preco Atual</th><th>Desconto</th><th>Status</th><th>Data</th><th>Acoes</th></tr></thead>
+            <tbody id="tabelaOfertas"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="flex-between">
+        <span class="text-sm text-muted" id="infoPagina"></span>
+        <div class="flex gap-8">
+          <button class="btn btn-outline btn-sm" onclick="mudarPagina(-1)">Anterior</button>
+          <button class="btn btn-outline btn-sm" onclick="mudarPagina(1)">Proxima</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal-overlay" id="modalNovaOferta">
+    <div class="modal">
+      <div class="modal-header"><h2 class="modal-title">Nova Oferta</h2><button class="modal-close">&#10005;</button></div>
+      <form id="formOferta">
+        <div class="form-group"><label>Produto *</label><input type="text" class="form-control" id="ofertaProduto" required></div>
+        <div class="grid-2">
+          <div class="form-group"><label>Plataforma *</label><select class="form-control" id="ofertaPlataforma" required><option value="shopee">Shopee</option><option value="mercadolivre">Mercado Livre</option></select></div>
+          <div class="form-group"><label>Categoria</label><select class="form-control" id="ofertaCategoria"></select></div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label>Preco Original (R$)</label><input type="number" class="form-control" id="ofertaPrecoAntigo" step="0.01"></div>
+          <div class="form-group"><label>Preco Atual (R$)</label><input type="number" class="form-control" id="ofertaPrecoNovo" step="0.01"></div>
+        </div>
+        <div class="form-group"><label>Link Original *</label><input type="url" class="form-control" id="ofertaLink" required></div>
+        <div class="form-group"><label>Loja</label><input type="text" class="form-control" id="ofertaLoja"></div>
+        <div class="form-group"><label>Descricao</label><textarea class="form-control" id="ofertaDescricao"></textarea></div>
+        <button type="submit" class="btn btn-primary w-full" style="justify-content:center;margin-top:8px;">Criar Oferta</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalEditarOferta">
+    <div class="modal">
+      <div class="modal-header"><h2 class="modal-title">Editar Oferta</h2><button class="modal-close">&#10005;</button></div>
+      <form id="formEditarOferta">
+        <input type="hidden" id="editOfertaId">
+        <div class="form-group"><label>Produto *</label><input type="text" class="form-control" id="editProduto" required></div>
+        <div class="grid-2">
+          <div class="form-group"><label>Plataforma</label><select class="form-control" id="editPlataforma"><option value="shopee">Shopee</option><option value="mercadolivre">Mercado Livre</option></select></div>
+          <div class="form-group"><label>Status</label><select class="form-control" id="editStatus"><option value="pendente">Pendente</option><option value="aprovada">Aprovada</option><option value="publicada">Publicada</option><option value="rejeitada">Rejeitada</option></select></div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label>Preco Original</label><input type="number" class="form-control" id="editPrecoAntigo" step="0.01"></div>
+          <div class="form-group"><label>Preco Atual</label><input type="number" class="form-control" id="editPrecoNovo" step="0.01"></div>
+        </div>
+        <div class="form-group"><label>Link Original</label><input type="url" class="form-control" id="editLink"></div>
+        <button type="submit" class="btn btn-primary w-full" style="justify-content:center;margin-top:8px;">Salvar</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/assets/js/app.js"></script>
+  <script src="/assets/js/layout.js"></script>
+  <script>
+    renderLayout('/ofertas');
+    let paginaAtual = 1;
+    let categorias = [];
+
+    async function loadCategorias() {
+      categorias = await API.get('/categorias') || [];
+      document.getElementById('filtroCategoria').innerHTML = '<option value="">Todas</option>' + categorias.map(c => '<option value="' + c.id + '">' + c.icone + ' ' + c.nome + '</option>').join('');
+      document.getElementById('ofertaCategoria').innerHTML = '<option value="">Selecione</option>' + categorias.map(c => '<option value="' + c.id + '">' + c.icone + ' ' + c.nome + '</option>').join('');
+    }
+
+    async function loadOfertas() {
+      const busca = document.getElementById('buscaOferta').value;
+      const status = document.getElementById('filtroStatus').value;
+      const plataforma = document.getElementById('filtroPlataforma').value;
+      const categoria = document.getElementById('filtroCategoria').value;
+      let url = '/ofertas?page=' + paginaAtual + '&limit=20';
+      if (busca) url += '&busca=' + encodeURIComponent(busca);
+      if (status) url += '&status=' + status;
+      if (plataforma) url += '&plataforma=' + plataforma;
+      if (categoria) url += '&categoria=' + categoria;
+      const data = await API.get(url);
+      if (!data) return;
+      const tbody = document.getElementById('tabelaOfertas');
+      if (!data.ofertas.length) { tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted" style="padding:40px">Nenhuma oferta encontrada</td></tr>'; return; }
+      tbody.innerHTML = data.ofertas.map(o => {
+        const badge = { pendente: 'badge-warning', aprovada: 'badge-info', publicada: 'badge-success', rejeitada: 'badge-danger', expirada: 'badge-purple' };
+        let actions = '';
+        if (o.status === 'pendente') actions = '<button class="btn btn-success btn-sm" onclick="aprovarOferta(' + o.id + ')">&#10003;</button> <button class="btn btn-danger btn-sm" onclick="rejeitarOferta(' + o.id + ')">&#10005;</button> ';
+        if (o.status === 'aprovada') actions = '<button class="btn btn-primary btn-sm" onclick="publicarOferta(' + o.id + ')">Enviar</button> ';
+        actions += '<button class="btn btn-outline btn-sm" onclick="editarOferta(' + o.id + ')">Editar</button> ';
+        actions += '<button class="btn btn-danger btn-sm" onclick="excluirOferta(' + o.id + ')">Del</button>';
+        return '<tr><td><div style="display:flex;align-items:center;gap:10px"><div class="oferta-img" style="display:flex;align-items:center;justify-content:center;font-size:20px">&#128230;</div><div><div style="font-weight:500;font-size:14px">' + o.produto + '</div><div style="font-size:12px;color:var(--text-muted)">' + (o.loja || '') + '</div></div></div></td><td><span class="tag">' + (o.plataforma === 'shopee' ? 'Shopee' : 'ML') + '</span></td><td>' + (o.categoria_icone || '') + ' ' + (o.categoria_nome || '-') + '</td><td style="text-decoration:line-through;color:var(--text-muted)">' + Utils.formatCurrency(o.preco_antigo) + '</td><td style="font-weight:600;color:var(--success)">' + Utils.formatCurrency(o.preco_novo) + '</td><td><span class="badge badge-success">' + o.desconto + '%</span></td><td><span class="badge ' + (badge[o.status] || 'badge-info') + '">' + o.status + '</span></td><td class="text-sm text-muted">' + Utils.timeAgo(o.criado_em) + '</td><td><div class="flex gap-8">' + actions + '</div></td></tr>';
+      }).join('');
+      document.getElementById('infoPagina').textContent = 'Pagina ' + data.page + ' de ' + data.pages + ' (' + data.total + ' ofertas)';
+    }
+
+    async function aprovarOferta(id) { await API.post('/ofertas/' + id + '/aprovar'); Toast.success('Aprovada!'); loadOfertas(); }
+    async function rejeitarOferta(id) { await API.post('/ofertas/' + id + '/rejeitar'); Toast.success('Rejeitada'); loadOfertas(); }
+    async function publicarOferta(id) { await API.post('/telegram/enviar/' + id, {}); Toast.success('Enviada ao Telegram!'); loadOfertas(); }
+    async function excluirOferta(id) { if (!confirm('Excluir?')) return; await API.delete('/ofertas/' + id); Toast.success('Excluida'); loadOfertas(); }
+    async function aprovarTodas() { const r = await API.post('/ofertas/aprovar-todas', {}); if (r) Toast.success(r.message); loadOfertas(); }
+
+    async function editarOferta(id) {
+      const o = await API.get('/ofertas/' + id);
+      if (!o) return;
+      document.getElementById('editOfertaId').value = o.id;
+      document.getElementById('editProduto').value = o.produto;
+      document.getElementById('editPlataforma').value = o.plataforma;
+      document.getElementById('editStatus').value = o.status;
+      document.getElementById('editPrecoAntigo').value = o.preco_antigo;
+      document.getElementById('editPrecoNovo').value = o.preco_novo;
+      document.getElementById('editLink').value = o.link_original;
+      document.getElementById('modalEditarOferta').classList.add('active');
+    }
+
+    function mudarPagina(dir) { paginaAtual = Math.max(1, paginaAtual + dir); loadOfertas(); }
+
+    document.getElementById('formOferta').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await API.post('/ofertas', {
+        produto: document.getElementById('ofertaProduto').value, plataforma: document.getElementById('ofertaPlataforma').value,
+        categoria_id: document.getElementById('ofertaCategoria').value || null, preco_antigo: document.getElementById('ofertaPrecoAntigo').value,
+        preco_novo: document.getElementById('ofertaPrecoNovo').value, link_original: document.getElementById('ofertaLink').value,
+        loja: document.getElementById('ofertaLoja').value, descricao: document.getElementById('ofertaDescricao').value
+      });
+      Toast.success('Oferta criada!');
+      closeModal('modalNovaOferta');
+      e.target.reset();
+      loadOfertas();
+    });
+
+    document.getElementById('formEditarOferta').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('editOfertaId').value;
+      await API.put('/ofertas/' + id, {
+        produto: document.getElementById('editProduto').value, plataforma: document.getElementById('editPlataforma').value,
+        status: document.getElementById('editStatus').value, preco_antigo: document.getElementById('editPrecoAntigo').value,
+        preco_novo: document.getElementById('editPrecoNovo').value, link_original: document.getElementById('editLink').value
+      });
+      Toast.success('Atualizada!');
+      closeModal('modalEditarOferta');
+      loadOfertas();
+    });
+
+    document.getElementById('buscaOferta').addEventListener('input', Utils.debounce(function() { paginaAtual = 1; loadOfertas(); }));
+    document.getElementById('filtroStatus').addEventListener('change', function() { paginaAtual = 1; loadOfertas(); });
+    document.getElementById('filtroPlataforma').addEventListener('change', function() { paginaAtual = 1; loadOfertas(); });
+    document.getElementById('filtroCategoria').addEventListener('change', function() { paginaAtual = 1; loadOfertas(); });
+
+    loadCategorias();
+    loadOfertas();
+  </script>
+</body>
+</html>

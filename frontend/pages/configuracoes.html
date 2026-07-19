@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OFERTASLAB - Configuracoes</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0a0a0f">
+</head>
+<body>
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header"><div class="sidebar-logo">&#9889;</div><span class="sidebar-title">OFERTASLAB</span></div>
+    <div class="sidebar-nav"></div>
+    <div class="sidebar-footer"><button class="sidebar-toggle">&#9664; <span class="sidebar-footer-text">Recolher</span></button></div>
+  </nav>
+
+  <main class="main-content">
+    <header class="header">
+      <div class="header-left"><h1 class="header-title">Configuracoes</h1></div>
+      <div class="header-right"><button class="btn btn-primary" onclick="salvarConfig()">Salvar</button></div>
+    </header>
+
+    <div class="page-content">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Geral</h3></div>
+          <div class="form-group"><label>URL Base (domínio do site)</label><input type="url" class="form-control" id="cfg_base_url" placeholder="https://seudominio.com"></div>
+          <div class="form-group"><label>Modo de Publicacao</label><select class="form-control" id="cfg_modo_publicacao"><option value="automatico">Automatico</option><option value="manual">Manual</option></select></div>
+          <div class="form-group"><label>Intervalo de Busca (minutos)</label><input type="number" class="form-control" id="cfg_intervalo_busca" value="5" min="1"></div>
+          <div class="form-group"><label>Limite Diario</label><input type="number" class="form-control" id="cfg_limite_diario" value="50" min="1"></div>
+          <div class="form-group"><label>Desconto Minimo (%)</label><input type="number" class="form-control" id="cfg_desconto_minimo" value="10" min="0"></div>
+          <div class="grid-2">
+            <div class="form-group"><label>Preco Minimo (R$)</label><input type="number" class="form-control" id="cfg_preco_minimo" value="5" step="0.01"></div>
+            <div class="form-group"><label>Preco Maximo (R$)</label><input type="number" class="form-control" id="cfg_preco_maximo" value="5000" step="0.01"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Afiliados</h3></div>
+          <div class="form-group"><label>Shopee - Affiliate ID</label><input type="text" class="form-control" id="cfg_shopee_affiliate_id"></div>
+          <div class="form-group"><label>Shopee - API Key</label><input type="text" class="form-control" id="cfg_shopee_api_key"></div>
+          <div class="form-group"><label>Shopee - API Secret</label><input type="password" class="form-control" id="cfg_shopee_api_secret"></div>
+          <hr style="border-color:var(--border-glass);margin:16px 0">
+          <div class="form-group"><label>Mercado Livre - Affiliate ID</label><input type="text" class="form-control" id="cfg_ml_affiliate_id"></div>
+          <div class="form-group"><label>Mercado Livre - App ID</label><input type="text" class="form-control" id="cfg_ml_app_id"></div>
+          <div class="form-group"><label>Mercado Livre - Secret Key</label><input type="password" class="form-control" id="cfg_ml_secret_key"></div>
+        </div>
+      </div>
+
+      <div class="grid-2 mt-16">
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Categorias</h3></div>
+          <div id="listaCategorias" style="max-height:300px;overflow-y:auto"></div>
+          <div class="flex gap-8 mt-16">
+            <input type="text" class="form-control" id="novaCategoriaNome" placeholder="Nome" style="flex:1">
+            <input type="text" class="form-control" id="novaCategoriaIcone" placeholder="Icone" style="width:60px" value="&#128230;">
+            <button class="btn btn-primary" onclick="adicionarCategoria()">+</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Logs Recentes</h3></div>
+          <div id="listaLogs" style="max-height:400px;overflow-y:auto;font-family:monospace;font-size:12px"></div>
+        </div>
+      </div>
+
+      <div class="card mt-16">
+        <div class="card-header"><h3 class="card-title">Campanhas</h3></div>
+        <div class="table-container">
+          <table><thead><tr><th>Nome</th><th>Desc. Min.</th><th>Palavras-chave</th><th>Acoes</th></tr></thead><tbody id="tabelaCampanhas"></tbody></table>
+        </div>
+        <div class="flex gap-8 mt-16">
+          <input type="text" class="form-control" id="campNome" placeholder="Nome da campanha" style="flex:2">
+          <input type="number" class="form-control" id="campDesconto" placeholder="Desc %" style="flex:1" value="10">
+          <input type="text" class="form-control" id="campPalavras" placeholder="Palavras-chave" style="flex:2">
+          <button class="btn btn-primary" onclick="criarCampanha()">Criar</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/assets/js/app.js"></script>
+  <script src="/assets/js/layout.js"></script>
+  <script>
+    renderLayout('/configuracoes');
+
+    async function loadConfig() {
+      const configs = await API.get('/config') || [];
+      configs.forEach(c => {
+        const el = document.getElementById('cfg_' + c.chave);
+        if (el) el.value = c.valor;
+      });
+    }
+
+    async function salvarConfig() {
+      const configs = {};
+      document.querySelectorAll('[id^="cfg_"]').forEach(el => { configs[el.id.replace('cfg_', '')] = el.value; });
+      await API.put('/config', configs);
+      Toast.success('Configuracoes salvas!');
+    }
+
+    async function loadCategorias() {
+      const cats = await API.get('/categorias') || [];
+      const container = document.getElementById('listaCategorias');
+      if (!cats.length) { container.innerHTML = '<p class="text-muted text-sm">Nenhuma categoria</p>'; return; }
+      container.innerHTML = cats.map(c => '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-glass)"><span>' + c.icone + ' ' + c.nome + ' <span class="text-muted text-sm">(' + c.total_ofertas + ' ofertas)</span></span><button class="btn btn-danger btn-sm" onclick="excluirCategoria(' + c.id + ')">Del</button></div>').join('');
+    }
+
+    async function adicionarCategoria() {
+      const nome = document.getElementById('novaCategoriaNome').value;
+      const icone = document.getElementById('novaCategoriaIcone').value || '&#128230;';
+      if (!nome) return Toast.error('Nome obrigatorio');
+      await API.post('/categorias', { nome: nome, icone: icone });
+      Toast.success('Categoria criada!');
+      document.getElementById('novaCategoriaNome').value = '';
+      loadCategorias();
+    }
+
+    async function excluirCategoria(id) {
+      if (!confirm('Excluir?')) return;
+      await API.delete('/categorias/' + id);
+      Toast.success('Excluida');
+      loadCategorias();
+    }
+
+    async function loadLogs() {
+      const logs = await API.get('/config/logs?limite=50') || [];
+      const container = document.getElementById('listaLogs');
+      if (!logs.length) { container.innerHTML = '<p class="text-muted">Nenhum log</p>'; return; }
+      container.innerHTML = logs.map(l => {
+        const cor = l.nivel === 'error' ? 'var(--danger)' : l.nivel === 'warn' ? 'var(--warning)' : 'var(--text-muted)';
+        return '<div style="padding:4px 0;border-bottom:1px solid var(--border-glass);color:' + cor + '">[' + l.nivel + '] ' + l.mensagem + ' <span style="color:var(--text-muted)">- ' + Utils.timeAgo(l.criado_em) + '</span></div>';
+      }).join('');
+    }
+
+    async function loadCampanhas() {
+      const camps = await API.get('/config/campanhas') || [];
+      const tbody = document.getElementById('tabelaCampanhas');
+      if (!camps.length) { tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted" style="padding:20px">Nenhuma campanha</td></tr>'; return; }
+      tbody.innerHTML = camps.map(c => '<tr><td>' + c.nome + '</td><td>' + c.desconto_minimo + '%</td><td class="text-sm">' + (c.palavras_chave || '-') + '</td><td><button class="btn btn-danger btn-sm" onclick="excluirCampanha(' + c.id + ')">Del</button></td></tr>').join('');
+    }
+
+    async function criarCampanha() {
+      const nome = document.getElementById('campNome').value;
+      const desconto = document.getElementById('campDesconto').value;
+      const palavras = document.getElementById('campPalavras').value;
+      if (!nome) return Toast.error('Nome obrigatorio');
+      await API.post('/config/campanhas', { nome: nome, desconto_minimo: desconto, palavras_chave: palavras });
+      Toast.success('Campanha criada!');
+      document.getElementById('campNome').value = '';
+      loadCampanhas();
+    }
+
+    async function excluirCampanha(id) {
+      if (!confirm('Excluir?')) return;
+      await API.delete('/config/campanhas/' + id);
+      Toast.success('Excluida');
+      loadCampanhas();
+    }
+
+    loadConfig();
+    loadCategorias();
+    loadLogs();
+    loadCampanhas();
+    setInterval(loadLogs, 30000);
+  </script>
+</body>
+</html>
