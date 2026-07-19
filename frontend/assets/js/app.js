@@ -36,7 +36,7 @@ const API = {
   },
 
   checkAuth() {
-    if (!this.token && !window.location.pathname.includes('/login')) {
+    if (!this.token && !window.location.pathname.includes('/login') && !window.location.pathname.includes('/ofertas-publicas')) {
       window.location.href = '/login';
       return false;
     }

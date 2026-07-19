@@ -1,6 +1,6 @@
 [build]
   publish = "frontend"
-  command = "echo 'Static site - no build needed'"
+  command = "echo 'ok'"
 
 [[redirects]]
   from = "/api/*"
@@ -15,6 +15,41 @@
   force = true
 
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from = "/login"
+  to = "/pages/login.html"
+  status = 200
+
+[[redirects]]
+  from = "/ofertas"
+  to = "/pages/ofertas.html"
+  status = 200
+
+[[redirects]]
+  from = "/telegram"
+  to = "/pages/telegram.html"
+  status = 200
+
+[[redirects]]
+  from = "/afiliados"
+  to = "/pages/afiliados.html"
+  status = 200
+
+[[redirects]]
+  from = "/analytics"
+  to = "/pages/analytics.html"
+  status = 200
+
+[[redirects]]
+  from = "/configuracoes"
+  to = "/pages/configuracoes.html"
+  status = 200
+
+[[redirects]]
+  from = "/ofertas-publicas"
+  to = "/pages/ofertas-publicas.html"
+  status = 200
+
+[[redirects]]
+  from = "/"
+  to = "/pages/dashboard.html"
   status = 200
