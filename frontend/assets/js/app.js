@@ -11,7 +11,9 @@ const API = {
       if (response.headers.get('content-type')?.includes('text/csv')) {
         return await response.blob();
       }
-      const data = await response.json();
+      const text = await response.text();
+      if (!text) { Toast.error('Servidor sem resposta. Tente novamente.'); return null; }
+      const data = JSON.parse(text);
       if (!response.ok) throw new Error(data.error || 'Erro na requisição');
       return data;
     } catch (err) {
@@ -154,13 +156,19 @@ function showEmpty(container, message) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(reg => {
+        if (reg.scope && !reg.scope.includes('ofertaslab')) {
+          reg.unregister();
+        }
+      });
+    });
+  }
+
   if (!window.location.pathname.includes('/login')) {
     if (!API.checkAuth()) return;
   }
   initSidebar();
   initModal();
-
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  }
 });
