@@ -41,3 +41,4 @@
   from = "/"
   to = "/pages/dashboard.html"
   status = 200
+  force = true
