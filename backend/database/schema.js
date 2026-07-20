@@ -217,6 +217,35 @@ async function initializeDatabase() {
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  await client.query(`CREATE TABLE IF NOT EXISTS whatsapp_canais (
+    id SERIAL PRIMARY KEY,
+    nome TEXT NOT NULL,
+    chat_id TEXT NOT NULL,
+    session_data TEXT,
+    ativo INTEGER DEFAULT 1,
+    horario_inicio TEXT DEFAULT '08:00',
+    horario_fim TEXT DEFAULT '23:00',
+    intervalo_minutos INTEGER DEFAULT 15,
+    limite_diario INTEGER DEFAULT 50,
+    mensagens_enviadas_hoje INTEGER DEFAULT 0,
+    ultimo_envio TIMESTAMP,
+    conectado INTEGER DEFAULT 0,
+    qr_code TEXT,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  await client.query(`CREATE TABLE IF NOT EXISTS whatsapp_publicacoes (
+    id SERIAL PRIMARY KEY,
+    oferta_id INTEGER NOT NULL,
+    canal_id INTEGER NOT NULL,
+    mensagem_id TEXT,
+    status TEXT DEFAULT 'enviada',
+    enviada_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (oferta_id) REFERENCES ofertas(id),
+    FOREIGN KEY (canal_id) REFERENCES whatsapp_canais(id)
+  )`);
+
   await client.query(`CREATE TABLE IF NOT EXISTS campanhas (
     id SERIAL PRIMARY KEY,
     nome TEXT NOT NULL,

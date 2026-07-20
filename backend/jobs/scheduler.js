@@ -3,6 +3,7 @@ const { getDatabase, getOne } = require('../database/schema');
 const { logInfo } = require('../utils/helpers');
 const dealCapture = require('../services/capture');
 const publisher = require('../services/publisher');
+const whatsappPublisher = require('../services/whatsapp');
 
 async function startCronJobs() {
   await getDatabase();
@@ -32,16 +33,27 @@ async function startCronJobs() {
   // Publicação no Telegram
   cron.schedule('*/3 * * * *', async () => {
     try {
-      await logInfo('[CRON] Verificando ofertas para publicar...');
+      await logInfo('[CRON] Verificando ofertas para publicar no Telegram...');
       await publisher.publishPendingOffers();
     } catch (err) {
-      await logInfo(`[CRON] Erro na publicação: ${err.message}`);
+      await logInfo(`[CRON] Erro na publicação Telegram: ${err.message}`);
+    }
+  });
+
+  // Publicação no WhatsApp
+  cron.schedule('*/3 * * * *', async () => {
+    try {
+      await logInfo('[CRON] Verificando ofertas para publicar no WhatsApp...');
+      await whatsappPublisher.publishPendingOffers();
+    } catch (err) {
+      await logInfo(`[CRON] Erro na publicação WhatsApp: ${err.message}`);
     }
   });
 
   // Reset de contadores diários
   cron.schedule('0 0 * * *', async () => {
     await publisher.resetDailyCounts();
+    await whatsappPublisher.resetDailyCounts();
     await logInfo('[CRON] Contadores diários resetados');
   });
 

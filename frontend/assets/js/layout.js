@@ -3,6 +3,7 @@ function renderLayout(activePage) {
     { href: '/', icon: '📊', label: 'Dashboard', section: 'Principal' },
     { href: '/ofertas', icon: '🏷️', label: 'Ofertas', section: 'Principal' },
     { href: '/telegram', icon: '📱', label: 'Telegram', section: 'Principal' },
+    { href: '/whatsapp', icon: '💬', label: 'WhatsApp', section: 'Principal' },
     { href: '/afiliados', icon: '🔗', label: 'Afiliados', section: 'Principal' },
     { href: '/analytics', icon: '📈', label: 'Analytics', section: 'Dados' },
     { href: '/configuracoes', icon: '⚙️', label: 'Configurações', section: 'Dados' },

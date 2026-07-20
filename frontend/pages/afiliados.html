@@ -7,6 +7,22 @@
   <link rel="stylesheet" href="/assets/css/style.css">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#0a0a0f">
+  <style>
+    .config-section { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    @media (max-width: 768px) { .config-section { grid-template-columns: 1fr; } }
+    .config-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+    .config-card h3 { margin: 0 0 16px 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+    .config-card .status { margin-left: auto; font-size: 12px; padding: 4px 8px; border-radius: 12px; }
+    .config-card .status.connected { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+    .config-card .status.disconnected { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    .config-card .form-group { margin-bottom: 12px; }
+    .config-card label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
+    .config-card input { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 14px; }
+    .config-card .actions { display: flex; gap: 8px; margin-top: 16px; }
+    .config-card .btn { flex: 1; }
+    .help-box { background: var(--bg-tertiary); padding: 12px; border-radius: 8px; margin-top: 12px; font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+    .help-box strong { color: var(--text-primary); }
+  </style>
 </head>
 <body>
   <nav class="sidebar" id="sidebar">
@@ -18,90 +34,189 @@
   <main class="main-content">
     <header class="header">
       <div class="header-left"><h1 class="header-title">Afiliados</h1></div>
-      <div class="header-right"><button class="btn btn-primary" data-modal="modalNovoAfiliado">+ Novo Afiliado</button></div>
     </header>
 
     <div class="page-content">
       <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
-        <div class="stat-card"><div class="stat-icon">&#127992;</div><div class="stat-value" id="statShopee">-</div><div class="stat-label">Afiliados Shopee</div></div>
-        <div class="stat-card"><div class="stat-icon">&#127993;</div><div class="stat-value" id="statML">-</div><div class="stat-label">Afiliados ML</div></div>
-        <div class="stat-card"><div class="stat-icon">&#9989;</div><div class="stat-value" id="statAtivos">-</div><div class="stat-label">Ativos</div></div>
+        <div class="stat-card"><div class="stat-icon">&#127992;</div><div class="stat-value" id="statShopee">-</div><div class="stat-label">Shopee</div></div>
+        <div class="stat-card"><div class="stat-icon">&#127993;</div><div class="stat-value" id="statML">-</div><div class="stat-label">Mercado Livre</div></div>
       </div>
 
-      <div class="card">
-        <div class="card-header"><h3 class="card-title">Contas de Afiliado</h3></div>
-        <div class="table-container">
-          <table>
-            <thead><tr><th>Plataforma</th><th>Conta</th><th>Affiliate ID</th><th>API Key</th><th>Status</th><th>Cadastro</th><th>Acoes</th></tr></thead>
-            <tbody id="tabelaAfiliados"></tbody>
-          </table>
+      <div class="config-section">
+        <div class="config-card">
+          <h3>
+            <span>&#127992; Shopee</span>
+            <span class="status disconnected" id="shopeeStatus">Nao configurado</span>
+          </h3>
+          <div class="form-group">
+            <label>Affiliate ID</label>
+            <input type="text" id="shopeeAffiliateId" placeholder="18320300035">
+          </div>
+          <div class="help-box">
+            <strong>Como encontrar:</strong> Acesse <a href="https://affiliate.shopee.com.br/account_setting" target="_blank" style="color:var(--accent)">affiliate.shopee.com.br</a> → Configuracoes da Conta → Seu ID aparece abaixo do nome de usuario.
+          </div>
+          <div class="actions">
+            <button class="btn btn-secondary" onclick="testShopee()">Testar</button>
+            <button class="btn btn-primary" onclick="saveShopeeConfig()">Salvar</button>
+          </div>
+        </div>
+
+        <div class="config-card">
+          <h3>
+            <span>&#127993; Mercado Livre</span>
+            <span class="status disconnected" id="mlStatus">Nao configurado</span>
+          </h3>
+          <div class="form-group">
+            <label>matt_word (Username)</label>
+            <input type="text" id="mlMattWord" placeholder="gogu2884099">
+          </div>
+          <div class="form-group">
+            <label>matt_tool (Tool ID)</label>
+            <input type="text" id="mlMattTool" placeholder="41688557">
+          </div>
+          <div class="help-box">
+            <strong>Como encontrar:</strong> Acesse <a href="https://www.mercadolivre.com.br/l/afiliados-home" target="_blank" style="color:var(--accent)">Portal do Afiliado</a> → Gerador de Links → Gere um link → Copie a URL completa e extraia <code>matt_word=X&matt_tool=Y</code>.
+          </div>
+          <div class="actions">
+            <button class="btn btn-secondary" onclick="testML()">Testar</button>
+            <button class="btn btn-primary" onclick="saveMLConfig()">Salvar</button>
+          </div>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-header"><h3 class="card-title">Configuracao de Afiliados</h3></div>
-        <div class="text-sm text-muted" style="line-height:1.8">
-          <p><strong>Shopee:</strong> Cadastre seu affiliate_id e API key nas configuracoes. O sistema converte automaticamente os links.</p>
-          <p><strong>Mercado Livre:</strong> Cadastre seu App ID e Secret Key. A conversao de links e automatica.</p>
+        <div class="card-header"><h3 class="card-title">Status</h3></div>
+        <div style="padding:20px">
+          <div id="statusGeral" style="color:var(--text-secondary)">Carregando...</div>
         </div>
       </div>
     </div>
   </main>
-
-  <div class="modal-overlay" id="modalNovoAfiliado">
-    <div class="modal">
-      <div class="modal-header"><h2 class="modal-title">Novo Afiliado</h2><button class="modal-close">&#10005;</button></div>
-      <form id="formAfiliado">
-        <div class="grid-2">
-          <div class="form-group"><label>Plataforma *</label><select class="form-control" id="afPlataforma" required><option value="shopee">Shopee</option><option value="mercadolivre">Mercado Livre</option></select></div>
-          <div class="form-group"><label>Conta *</label><input type="text" class="form-control" id="afConta" required></div>
-        </div>
-        <div class="form-group"><label>Affiliate ID</label><input type="text" class="form-control" id="afAffiliateId"></div>
-        <div class="grid-2">
-          <div class="form-group"><label>API Key</label><input type="text" class="form-control" id="afApiKey"></div>
-          <div class="form-group"><label>API Secret</label><input type="password" class="form-control" id="afApiSecret"></div>
-        </div>
-        <button type="submit" class="btn btn-primary w-full" style="justify-content:center;margin-top:8px;">Cadastrar</button>
-      </form>
-    </div>
-  </div>
 
   <script src="/assets/js/app.js"></script>
   <script src="/assets/js/layout.js"></script>
   <script>
     renderLayout('/afiliados');
 
-    async function loadAfiliados() {
-      const afiliados = await API.get('/afiliados') || [];
-      document.getElementById('statShopee').textContent = afiliados.filter(a => a.plataforma === 'shopee').length;
-      document.getElementById('statML').textContent = afiliados.filter(a => a.plataforma === 'mercadolivre').length;
-      document.getElementById('statAtivos').textContent = afiliados.filter(a => a.ativo).length;
-      const tbody = document.getElementById('tabelaAfiliados');
-      if (!afiliados.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding:30px">Nenhum afiliado cadastrado</td></tr>'; return; }
-      tbody.innerHTML = afiliados.map(a => '<tr><td><span class="tag">' + (a.plataforma === 'shopee' ? 'Shopee' : 'Mercado Livre') + '</span></td><td>' + a.conta + '</td><td><code style="font-size:12px">' + (a.affiliate_id || '-') + '</code></td><td><code style="font-size:12px">' + (a.api_key ? '****' + a.api_key.slice(-4) : '-') + '</code></td><td><span class="badge ' + (a.ativo ? 'badge-success' : 'badge-danger') + '">' + (a.ativo ? 'Ativo' : 'Inativo') + '</span></td><td class="text-sm text-muted">' + Utils.formatDate(a.criado_em) + '</td><td><button class="btn btn-danger btn-sm" onclick="excluirAfiliado(' + a.id + ')">Del</button></td></tr>').join('');
+    async function loadConfigs() {
+      try {
+        const shopeeConfig = await API.get('/afiliados/config/shopee');
+        const mlConfig = await API.get('/afiliados/config/mercadolivre');
+        
+        if (shopeeConfig) {
+          document.getElementById('shopeeAffiliateId').value = shopeeConfig.affiliate_id || '';
+          if (shopeeConfig.affiliate_id) {
+            document.getElementById('shopeeStatus').textContent = 'Configurado';
+            document.getElementById('shopeeStatus').className = 'status connected';
+          }
+        }
+        
+        if (mlConfig) {
+          document.getElementById('mlMattWord').value = mlConfig.matt_word || '';
+          document.getElementById('mlMattTool').value = mlConfig.matt_tool || '';
+          if (mlConfig.matt_word || mlConfig.matt_tool) {
+            document.getElementById('mlStatus').textContent = 'Configurado';
+            document.getElementById('mlStatus').className = 'status connected';
+          }
+        }
+
+        updateStatus(shopeeConfig, mlConfig);
+      } catch (err) {
+        console.error('Erro ao carregar configs:', err);
+      }
     }
 
-    async function excluirAfiliado(id) {
-      if (!confirm('Excluir?')) return;
-      await API.delete('/afiliados/' + id);
-      Toast.success('Excluido');
-      loadAfiliados();
+    function updateStatus(shopeeConfig, mlConfig) {
+      const shopeeOk = shopeeConfig && shopeeConfig.affiliate_id;
+      const mlOk = mlConfig && (mlConfig.matt_word || mlConfig.matt_tool);
+      
+      let html = '';
+      if (shopeeOk && mlOk) {
+        html = '<span style="color:#22c55e">&#10004; Shopee e Mercado Livre configurados. Ofertas serao publicadas com seus links de afiliado.</span>';
+      } else if (shopeeOk) {
+        html = '<span style="color:#22c55e">&#10004; Shopee configurado.</span> <span style="color:#eab308">&#9888; Configure o Mercado Livre para completar.</span>';
+      } else if (mlOk) {
+        html = '<span style="color:#22c55e">&#10004; Mercado Livre configurado.</span> <span style="color:#eab308">&#9888; Configure o Shopee para completar.</span>';
+      } else {
+        html = '<span style="color:#ef4444">&#10008; Nenhuma plataforma configurada. Preencha os IDs acima e clique em Salvar.</span>';
+      }
+      document.getElementById('statusGeral').innerHTML = html;
     }
 
-    document.getElementById('formAfiliado').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      await API.post('/afiliados', {
-        plataforma: document.getElementById('afPlataforma').value, conta: document.getElementById('afConta').value,
-        affiliate_id: document.getElementById('afAffiliateId').value, api_key: document.getElementById('afApiKey').value,
-        api_secret: document.getElementById('afApiSecret').value
-      });
-      Toast.success('Cadastrado!');
-      closeModal('modalNovoAfiliado');
-      e.target.reset();
-      loadAfiliados();
-    });
+    async function testShopee() {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = 'Testando...';
+      try {
+        const result = await API.post('/afiliados/test/shopee');
+        if (result.success) {
+          Toast.success(result.message || 'OK!');
+          document.getElementById('shopeeStatus').textContent = 'Configurado';
+          document.getElementById('shopeeStatus').className = 'status connected';
+        } else {
+          Toast.error(result.message || 'Erro');
+          document.getElementById('shopeeStatus').textContent = 'Erro';
+          document.getElementById('shopeeStatus').className = 'status disconnected';
+        }
+      } catch (err) {
+        Toast.error('Erro: ' + err.message);
+      }
+      btn.disabled = false;
+      btn.textContent = 'Testar';
+    }
 
-    loadAfiliados();
+    async function testML() {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = 'Testando...';
+      try {
+        const result = await API.post('/afiliados/test/mercadolivre');
+        if (result.success) {
+          Toast.success(result.message || 'OK!');
+          document.getElementById('mlStatus').textContent = 'Configurado';
+          document.getElementById('mlStatus').className = 'status connected';
+        } else {
+          Toast.error(result.message || 'Erro');
+          document.getElementById('mlStatus').textContent = 'Erro';
+          document.getElementById('mlStatus').className = 'status disconnected';
+        }
+      } catch (err) {
+        Toast.error('Erro: ' + err.message);
+      }
+      btn.disabled = false;
+      btn.textContent = 'Testar';
+    }
+
+    async function saveShopeeConfig() {
+      try {
+        await API.put('/afiliados/config/shopee', {
+          affiliate_id: document.getElementById('shopeeAffiliateId').value
+        });
+        Toast.success('Shopee salvo!');
+        document.getElementById('shopeeStatus').textContent = 'Configurado';
+        document.getElementById('shopeeStatus').className = 'status connected';
+        loadConfigs();
+      } catch (err) {
+        Toast.error('Erro: ' + err.message);
+      }
+    }
+
+    async function saveMLConfig() {
+      try {
+        await API.put('/afiliados/config/mercadolivre', {
+          matt_word: document.getElementById('mlMattWord').value,
+          matt_tool: document.getElementById('mlMattTool').value
+        });
+        Toast.success('ML salvo!');
+        document.getElementById('mlStatus').textContent = 'Configurado';
+        document.getElementById('mlStatus').className = 'status connected';
+        loadConfigs();
+      } catch (err) {
+        Toast.error('Erro: ' + err.message);
+      }
+    }
+
+    loadConfigs();
   </script>
 </body>
 </html>

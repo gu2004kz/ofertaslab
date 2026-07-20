@@ -18,6 +18,11 @@
   status = 200
 
 [[redirects]]
+  from = "/whatsapp"
+  to = "/pages/whatsapp.html"
+  status = 200
+
+[[redirects]]
   from = "/afiliados"
   to = "/pages/afiliados.html"
   status = 200

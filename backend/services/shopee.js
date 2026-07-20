@@ -1,5 +1,6 @@
 const { getDatabase, getOne, getAll, runQuery } = require('../database/schema');
 const { logInfo, logError } = require('../utils/helpers');
+const crypto = require('crypto');
 
 class ShopeeService {
   constructor() {
@@ -9,26 +10,68 @@ class ShopeeService {
   async getConfig() {
     const affiliate_id = (await getOne("SELECT valor FROM configuracoes WHERE chave = 'shopee_affiliate_id'"))?.valor;
     const api_key = (await getOne("SELECT valor FROM configuracoes WHERE chave = 'shopee_api_key'"))?.valor;
-    return { affiliate_id, api_key };
+    const api_secret = (await getOne("SELECT valor FROM configuracoes WHERE chave = 'shopee_api_secret'"))?.valor;
+    return { affiliate_id, api_key, api_secret };
+  }
+
+  generateSignature(appId, timestamp, payload, secret) {
+    const data = `${appId}${timestamp}${payload}${secret}`;
+    return crypto.createHash('sha256').update(data).digest('hex');
   }
 
   async searchProducts(query, options = {}) {
     const { limit = 20 } = options;
     try {
       const config = await this.getConfig();
-      if (!config.api_key) {
+      
+      if (!config.api_key || !config.api_secret) {
         return this.simulateSearch(query, options);
       }
+
       const axios = require('axios');
-      const response = await axios.post(this.baseUrl, {
-        query: `query { productSearch(keyword: "${query}", sort: sales, limit: ${limit}) { nodes { name price image url affiliateUrl commissionRate } } }`
-      }, {
-        headers: {
-          'Authorization': `Bearer ${config.api_key}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000
+      const timestamp = Math.floor(Date.now() / 1000);
+      const payload = JSON.stringify({
+        query: `query {
+          productSearch(
+            keyword: "${query}"
+            sort: sales
+            limit: ${limit}
+          ) {
+            nodes {
+              name
+              price
+              image
+              url
+              affiliateUrl
+              commissionRate
+              shopName
+              sold
+              ratingStar
+              priceBeforeDiscount
+            }
+          }
+        }`
       });
+
+      const signature = this.generateSignature(
+        config.api_key,
+        timestamp,
+        payload,
+        config.api_secret
+      );
+
+      const response = await axios.post(
+        this.baseUrl,
+        payload,
+        {
+          headers: {
+            'Authorization': `SHA256 Credential=${config.api_key}, Timestamp=${timestamp}, Signature=${signature}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 15000
+        }
+      );
+
       return this.processResults(response.data, config);
     } catch (err) {
       await logError('[Shopee] Erro na busca', err.message);
@@ -53,8 +96,15 @@ class ShopeeService {
 
   convertLink(originalUrl, affiliateId) {
     if (!affiliateId) return originalUrl;
-    const sep = originalUrl.includes('?') ? '&' : '?';
-    return `${originalUrl}${sep}affiliate_id=${affiliateId}`;
+    
+    try {
+      const url = new URL(originalUrl);
+      url.searchParams.set('affiliate_id', affiliateId);
+      return url.toString();
+    } catch (e) {
+      const sep = originalUrl.includes('?') ? '&' : '?';
+      return `${originalUrl}${sep}affiliate_id=${affiliateId}`;
+    }
   }
 
   processResults(data, config) {
@@ -78,6 +128,49 @@ class ShopeeService {
     } catch (err) {
       logError('[Shopee] Erro ao processar resultados', err.message);
       return [];
+    }
+  }
+
+  async generateShortLink(originalUrl, subIds = []) {
+    try {
+      const config = await this.getConfig();
+      if (!config.api_key || !config.api_secret) return originalUrl;
+
+      const axios = require('axios');
+      const timestamp = Math.floor(Date.now() / 1000);
+      const subIdParam = subIds.length > 0 ? `, subIds: [${subIds.map(s => `"${s}"`).join(', ')}]` : '';
+      
+      const payload = JSON.stringify({
+        query: `mutation {
+          generateShortLink(originUrl: "${originalUrl}"${subIdParam}) {
+            shortLink
+          }
+        }`
+      });
+
+      const signature = this.generateSignature(
+        config.api_key,
+        timestamp,
+        payload,
+        config.api_secret
+      );
+
+      const response = await axios.post(
+        this.baseUrl,
+        payload,
+        {
+          headers: {
+            'Authorization': `SHA256 Credential=${config.api_key}, Timestamp=${timestamp}, Signature=${signature}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+
+      return response.data?.data?.generateShortLink?.shortLink || originalUrl;
+    } catch (err) {
+      await logError('[Shopee] Erro ao gerar link curto', err.message);
+      return originalUrl;
     }
   }
 
