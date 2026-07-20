@@ -6,14 +6,6 @@ class TelegramPublisher {
     this.axios = require('axios');
   }
 
-  async getBaseUrl() {
-    try {
-      return (await getOne("SELECT valor FROM configuracoes WHERE chave = 'base_url'"))?.valor || 'http://localhost:3000';
-    } catch (e) {
-      return 'http://localhost:3000';
-    }
-  }
-
   getLink(oferta) {
     return oferta.link_afiliado || oferta.link_original;
   }
@@ -35,25 +27,31 @@ class TelegramPublisher {
         photo: photoUrl,
         caption: caption,
         parse_mode: 'Markdown'
-      });
+      }, { timeout: 30000 });
       return { success: true, messageId: response.data.result?.message_id };
     } catch (err) {
-      await logError('[Telegram] Erro ao enviar foto', err.message);
-      return { success: false, error: err.message };
+      await logError('[Telegram] Erro ao enviar foto, tentando sem foto', err.message);
+      try {
+        const response = await this.axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          chat_id: channelId, text: caption, parse_mode: 'Markdown'
+        });
+        return { success: true, messageId: response.data.result?.message_id };
+      } catch (err2) {
+        return { success: false, error: err2.message };
+      }
     }
   }
 
   async sendToChannel(botToken, channelId, message, photoUrl) {
+    if (photoUrl && photoUrl.startsWith('http')) {
+      return await this.sendPhotoWithCaption(botToken, channelId, photoUrl, message);
+    }
     try {
-      if (photoUrl) {
-        return await this.sendPhotoWithCaption(botToken, channelId, photoUrl, message);
-      }
       const response = await this.axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         chat_id: channelId, text: message, parse_mode: 'Markdown', disable_web_page_preview: false
       });
       return { success: true, messageId: response.data.result?.message_id };
     } catch (err) {
-      await logError('[Telegram] Erro ao enviar mensagem', err.message);
       return { success: false, error: err.message };
     }
   }
