@@ -1,5 +1,6 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
+const { MessageMedia } = require('whatsapp-web.js');
 const { getDatabase, getOne, getAll, runQuery } = require('../database/schema');
 const { logInfo, logError } = require('../utils/helpers');
 
@@ -17,9 +18,14 @@ class WhatsAppPublisher {
     }
   }
 
-  formatMessage(oferta, link) {
+  getLink(oferta) {
+    return oferta.link_afiliado || oferta.link_original;
+  }
+
+  formatMessage(oferta) {
     const oldPrice = parseFloat(oferta.preco_antigo).toFixed(2);
     const newPrice = parseFloat(oferta.preco_novo).toFixed(2);
+    const link = this.getLink(oferta);
     let msg = `🔥 *OFERTA IMPERDÍVEL*\n\n📦 *Produto:* ${oferta.produto}\n\n💸 De: R$ ${oldPrice}\n🔥 Por: R$ ${newPrice}\n📉 Desconto: ${oferta.desconto}%`;
     if (oferta.loja) msg += `\n🏪 Loja: ${oferta.loja}`;
     msg += `\n\n🛒 *Comprar:*\n${link}\n\n⚠️ Promoção por tempo limitado.`;
@@ -80,7 +86,20 @@ class WhatsAppPublisher {
     }
   }
 
-  async sendMessage(canalId, message) {
+  async downloadImage(url) {
+    try {
+      const axios = require('axios');
+      const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
+      const base64 = Buffer.from(response.data).toString('base64');
+      const mimeType = response.headers['content-type'] || 'image/jpeg';
+      return MessageMedia.fromFilePath(`data:${mimeType};base64,${base64}`);
+    } catch (err) {
+      await logError('[WhatsApp] Erro ao baixar imagem', err.message);
+      return null;
+    }
+  }
+
+  async sendMessage(canalId, message, imageUrl) {
     try {
       const canal = await getOne('SELECT * FROM whatsapp_canais WHERE id = ?', [canalId]);
       if (!canal) return { success: false, error: 'Canal não encontrado' };
@@ -93,6 +112,15 @@ class WhatsAppPublisher {
       }
 
       const chat = await client.getChatById(canal.chat_id);
+
+      if (imageUrl) {
+        const media = await this.downloadImage(imageUrl);
+        if (media) {
+          const sentMessage = await chat.sendMessage(media, { caption: message });
+          return { success: true, messageId: sentMessage.id._serialized };
+        }
+      }
+
       const sentMessage = await chat.sendMessage(message);
       return { success: true, messageId: sentMessage.id._serialized };
     } catch (err) {
@@ -110,7 +138,6 @@ class WhatsAppPublisher {
 
     await logInfo(`[WhatsApp] ${ofertas.length} ofertas para publicar em ${canais.length} canal(is)`);
     let publicadas = 0;
-    const baseUrl = await this.getBaseUrl();
 
     for (const canal of canais) {
       if (!canal.conectado) continue;
@@ -126,9 +153,8 @@ class WhatsAppPublisher {
         const jaPublicada = await getOne('SELECT id FROM whatsapp_publicacoes WHERE oferta_id = ? AND canal_id = ? AND status = ?', [oferta.id, canal.id, 'enviada']);
         if (jaPublicada) continue;
 
-        const link = `${baseUrl}/go/${oferta.id}`;
-        const msg = this.formatMessage(oferta, link);
-        const result = await this.sendMessage(canal.id, msg);
+        const msg = this.formatMessage(oferta);
+        const result = await this.sendMessage(canal.id, msg, oferta.imagem);
 
         if (result.success) {
           await runQuery('INSERT INTO whatsapp_publicacoes (oferta_id, canal_id, mensagem_id, status) VALUES (?, ?, ?, ?)', [oferta.id, canal.id, String(result.messageId || ''), 'enviada']);

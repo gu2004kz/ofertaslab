@@ -71,7 +71,7 @@ class DealCapture {
           const existe = await getOne('SELECT id FROM ofertas WHERE produto = $1 AND plataforma = $2', [oferta.produto, oferta.plataforma]);
           if (existe) continue;
 
-          const link_afiliado = await this.generateAffiliateLink(oferta.link_original, oferta.plataforma);
+          const link_afiliado = oferta.link_afiliado || await this.generateAffiliateLink(oferta.link_original, oferta.plataforma);
           const modo = await getOne("SELECT valor FROM configuracoes WHERE chave = 'modo_publicacao'");
           const status = modo?.valor === 'automatico' ? 'aprovada' : 'pendente';
 

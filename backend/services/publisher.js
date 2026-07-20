@@ -14,17 +14,40 @@ class TelegramPublisher {
     }
   }
 
-  formatMessage(oferta, link) {
+  getLink(oferta) {
+    return oferta.link_afiliado || oferta.link_original;
+  }
+
+  formatMessage(oferta) {
     const oldPrice = parseFloat(oferta.preco_antigo).toFixed(2);
     const newPrice = parseFloat(oferta.preco_novo).toFixed(2);
+    const link = this.getLink(oferta);
     let msg = `🔥 *OFERTA IMPERDÍVEL*\n\n📦 *Produto:* ${oferta.produto}\n\n💸 De: R$ ${oldPrice}\n🔥 Por: R$ ${newPrice}\n📉 Desconto: ${oferta.desconto}%`;
     if (oferta.loja) msg += `\n🏪 Loja: ${oferta.loja}`;
     msg += `\n\n🛒 *Comprar:*\n${link}\n\n⚠️ Promoção por tempo limitado.`;
     return msg;
   }
 
-  async sendToChannel(botToken, channelId, message) {
+  async sendPhotoWithCaption(botToken, channelId, photoUrl, caption) {
     try {
+      const response = await this.axios.post(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+        chat_id: channelId,
+        photo: photoUrl,
+        caption: caption,
+        parse_mode: 'Markdown'
+      });
+      return { success: true, messageId: response.data.result?.message_id };
+    } catch (err) {
+      await logError('[Telegram] Erro ao enviar foto', err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  async sendToChannel(botToken, channelId, message, photoUrl) {
+    try {
+      if (photoUrl) {
+        return await this.sendPhotoWithCaption(botToken, channelId, photoUrl, message);
+      }
       const response = await this.axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         chat_id: channelId, text: message, parse_mode: 'Markdown', disable_web_page_preview: false
       });
@@ -44,7 +67,6 @@ class TelegramPublisher {
 
     await logInfo(`[Telegram] ${ofertas.length} ofertas para publicar em ${canais.length} canal(is)`);
     let publicadas = 0;
-    const baseUrl = await this.getBaseUrl();
 
     for (const canal of canais) {
       const now = new Date();
@@ -58,9 +80,8 @@ class TelegramPublisher {
         const jaPublicada = await getOne('SELECT id FROM publicacoes WHERE oferta_id = ? AND canal_id = ? AND status = ?', [oferta.id, canal.id, 'enviada']);
         if (jaPublicada) continue;
 
-        const link = `${baseUrl}/go/${oferta.id}`;
-        const msg = this.formatMessage(oferta, link);
-        const result = await this.sendToChannel(canal.bot_token, canal.canal_id, msg);
+        const msg = this.formatMessage(oferta);
+        const result = await this.sendToChannel(canal.bot_token, canal.canal_id, msg, oferta.imagem);
 
         if (result.success) {
           await runQuery('INSERT INTO publicacoes (oferta_id, canal_id, mensagem_id, status) VALUES (?, ?, ?, ?)', [oferta.id, canal.id, String(result.messageId || ''), 'enviada']);

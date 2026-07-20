@@ -78,17 +78,27 @@ router.post('/enviar/:ofertaId', async (req, res) => {
       canais = await getAll('SELECT * FROM telegram_canais WHERE ativo = 1');
     }
 
+    const link = oferta.link_afiliado || oferta.link_original;
+    const msg = `🔥 *OFERTA IMPERDÍVEL*\n\n📦 *Produto:* ${oferta.produto}\n\n💸 De: R$ ${oferta.preco_antigo}\n🔥 Por: R$ ${oferta.preco_novo}\n📉 Desconto: ${oferta.desconto}%\n\n🛒 *Comprar:*\n${link}\n\n⚠️ Promoção por tempo limitado.`;
+
     const results = [];
     for (const canal of canais) {
       if (!canal) continue;
-      const link = `${getBaseUrl(req)}/go/${oferta.id}`;
-      const msg = `🔥 *OFERTA IMPERDÍVEL*\n\n📦 *Produto:* ${oferta.produto}\n\n💸 De: R$ ${oferta.preco_antigo}\n🔥 Por: R$ ${oferta.preco_novo}\n📉 Desconto: ${oferta.desconto}%\n\n🛒 *Comprar:*\n${link}\n\n⚠️ Promoção por tempo limitado.`;
 
       try {
         const axios = require('axios');
-        const response = await axios.post(`https://api.telegram.org/bot${canal.bot_token}/sendMessage`, {
-          chat_id: canal.canal_id, text: msg, parse_mode: 'Markdown'
-        });
+        let response;
+
+        if (oferta.imagem) {
+          response = await axios.post(`https://api.telegram.org/bot${canal.bot_token}/sendPhoto`, {
+            chat_id: canal.canal_id, photo: oferta.imagem, caption: msg, parse_mode: 'Markdown'
+          });
+        } else {
+          response = await axios.post(`https://api.telegram.org/bot${canal.bot_token}/sendMessage`, {
+            chat_id: canal.canal_id, text: msg, parse_mode: 'Markdown'
+          });
+        }
+
         await runQuery('INSERT INTO publicacoes (oferta_id, canal_id, mensagem_id, status) VALUES (?, ?, ?, ?)', [oferta.id, canal.id, String(response.data.result?.message_id || ''), 'enviada']);
         await runQuery("UPDATE ofertas SET status = 'publicada', publicada_em = CURRENT_TIMESTAMP WHERE id = ?", [oferta.id]);
         await runQuery("UPDATE telegram_canais SET mensagens_enviadas_hoje = mensagens_enviadas_hoje + 1, ultimo_envio = CURRENT_TIMESTAMP WHERE id = ?", [canal.id]);

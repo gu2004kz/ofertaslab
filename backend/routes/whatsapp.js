@@ -80,13 +80,14 @@ router.post('/enviar/:ofertaId', async (req, res) => {
       canais = await getAll('SELECT * FROM whatsapp_canais WHERE ativo = 1');
     }
 
+    const link = oferta.link_afiliado || oferta.link_original;
+    const msg = `🔥 *OFERTA IMPERDÍVEL*\n\n📦 *Produto:* ${oferta.produto}\n\n💸 De: R$ ${oferta.preco_antigo}\n🔥 Por: R$ ${oferta.preco_novo}\n📉 Desconto: ${oferta.desconto}%\n\n🛒 *Comprar:*\n${link}\n\n⚠️ Promoção por tempo limitado.`;
+
     const results = [];
     for (const canal of canais) {
       if (!canal) continue;
-      const link = `${getBaseUrl(req)}/go/${oferta.id}`;
-      const msg = `🔥 *OFERTA IMPERDÍVEL*\n\n📦 *Produto:* ${oferta.produto}\n\n💸 De: R$ ${oferta.preco_antigo}\n🔥 Por: R$ ${oferta.preco_novo}\n📉 Desconto: ${oferta.desconto}%\n\n🛒 *Comprar:*\n${link}\n\n⚠️ Promoção por tempo limitado.`;
 
-      const result = await whatsappPublisher.sendMessage(canal.id, msg);
+      const result = await whatsappPublisher.sendMessage(canal.id, msg, oferta.imagem);
 
       if (result.success) {
         await runQuery('INSERT INTO whatsapp_publicacoes (oferta_id, canal_id, mensagem_id, status) VALUES (?, ?, ?, ?)', [oferta.id, canal.id, String(result.messageId || ''), 'enviada']);
