@@ -18,7 +18,9 @@ class AfiliadosService {
       mercadolivre: {
         affiliate_id: 'ml_affiliate_id',
         matt_word: 'ml_matt_word',
-        matt_tool: 'ml_matt_tool'
+        matt_tool: 'ml_matt_tool',
+        app_id: 'ml_app_id',
+        secret_key: 'ml_secret_key'
       }
     };
 
@@ -43,7 +45,9 @@ class AfiliadosService {
       mercadolivre: {
         affiliate_id: 'ml_affiliate_id',
         matt_word: 'ml_matt_word',
-        matt_tool: 'ml_matt_tool'
+        matt_tool: 'ml_matt_tool',
+        app_id: 'ml_app_id',
+        secret_key: 'ml_secret_key'
       }
     };
 

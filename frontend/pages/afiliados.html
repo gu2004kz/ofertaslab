@@ -74,8 +74,17 @@
             <label>matt_tool (Tool ID)</label>
             <input type="text" id="mlMattTool" placeholder="41688557">
           </div>
+          <div class="form-group">
+            <label>App ID (API - opcional)</label>
+            <input type="text" id="mlAppId" placeholder="Se tiver app registrado em developers.mercadolivre.com.br">
+          </div>
+          <div class="form-group">
+            <label>Secret Key (API - opcional)</label>
+            <input type="password" id="mlSecretKey" placeholder="Secret do app ML">
+          </div>
           <div class="help-box">
-            <strong>Como encontrar:</strong> Acesse <a href="https://www.mercadolivre.com.br/l/afiliados-home" target="_blank" style="color:var(--accent)">Portal do Afiliado</a> → Gerador de Links → Gere um link → Copie a URL completa e extraia <code>matt_word=X&matt_tool=Y</code>.
+            <strong>Como encontrar:</strong> Acesse <a href="https://www.mercadolivre.com.br/l/afiliados-home" target="_blank" style="color:var(--accent)">Portal do Afiliado</a> → Gerador de Links → Gere um link → Copie a URL completa e extraia <code>matt_word=X&matt_tool=Y</code>.<br><br>
+            <strong>Para API (producao):</strong> Cadastre um app em <a href="https://developers.mercadolivre.com.br" target="_blank" style="color:var(--accent)">developers.mercadolivre.com.br</a> para obter App ID e Secret Key. Necessario para captura automatica no Render.
           </div>
           <div class="actions">
             <button class="btn btn-secondary" onclick="testML()">Testar</button>
@@ -114,6 +123,8 @@
         if (mlConfig) {
           document.getElementById('mlMattWord').value = mlConfig.matt_word || '';
           document.getElementById('mlMattTool').value = mlConfig.matt_tool || '';
+          document.getElementById('mlAppId').value = mlConfig.app_id || '';
+          document.getElementById('mlSecretKey').value = mlConfig.secret_key || '';
           if (mlConfig.matt_word || mlConfig.matt_tool) {
             document.getElementById('mlStatus').textContent = 'Configurado';
             document.getElementById('mlStatus').className = 'status connected';
@@ -205,7 +216,9 @@
       try {
         await API.put('/afiliados/config/mercadolivre', {
           matt_word: document.getElementById('mlMattWord').value,
-          matt_tool: document.getElementById('mlMattTool').value
+          matt_tool: document.getElementById('mlMattTool').value,
+          app_id: document.getElementById('mlAppId').value,
+          secret_key: document.getElementById('mlSecretKey').value
         });
         Toast.success('ML salvo!');
         document.getElementById('mlStatus').textContent = 'Configurado';

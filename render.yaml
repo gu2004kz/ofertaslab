@@ -4,7 +4,7 @@ services:
     runtime: node
     region: oregon
     plan: free
-    buildCommand: npm install && npx puppeteer browsers install chrome
+    buildCommand: npm install
     startCommand: node backend/server.js
     envVars:
       - key: NODE_ENV
@@ -15,14 +15,6 @@ services:
           property: connectionString
       - key: BASE_URL
         value: https://ofertaslab.onrender.com
-      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
-        value: true
-      - key: PUPPETEER_EXECUTABLE_PATH
-        value: /usr/bin/google-chrome-stable
-    disk:
-      name: data
-      mountPath: /opt/render/project/src
-      sizeGB: 1
 
 databases:
   - name: ofertaslab-db

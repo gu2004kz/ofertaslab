@@ -181,6 +181,7 @@ function seedDefaultDataPostgres(client) {
         ['preco_maximo', '5000'], ['intervalo_busca', '5'], ['limite_diario', '50'],
         ['shopee_affiliate_id', ''], ['shopee_api_key', ''], ['shopee_api_secret', ''],
         ['ml_matt_word', ''], ['ml_matt_tool', ''],
+        ['ml_app_id', ''], ['ml_secret_key', ''],
         ['notificacoes_ativas', 'true'], ['backup_automatico', 'true'],
         ['tema', 'dark'], ['base_url', 'http://localhost:3000'],
       ];
@@ -244,8 +245,9 @@ function seedDefaultDataSqlite(client) {
       ['preco_minimo', '5', 'Preco minimo'], ['preco_maximo', '5000', 'Preco maximo'],
       ['intervalo_busca', '5', 'Intervalo de busca'], ['limite_diario', '50', 'Limite diario'],
       ['shopee_affiliate_id', '', 'Affiliate ID Shopee'], ['shopee_api_key', '', 'API Key Shopee'],
-      ['shopee_api_secret', '', 'API Secret Shopee'], ['ml_matt_word', '', 'Username ML Afiliados'],
-      ['ml_matt_tool', '', 'Tool ID ML Afiliados'], ['notificacoes_ativas', 'true', 'Notificacoes'],
+      ['shopee_api_secret', '', 'API Secret Shopee'],       ['ml_matt_word', '', 'Username ML Afiliados'],
+      ['ml_matt_tool', '', 'Tool ID ML Afiliados'], ['ml_app_id', '', 'App ID ML API'],
+      ['ml_secret_key', '', 'Secret Key ML API'], ['notificacoes_ativas', 'true', 'Notificacoes'],
       ['backup_automatico', 'true', 'Backup automatico'], ['tema', 'dark', 'Tema'],
       ['base_url', 'http://localhost:3000', 'URL base'],
     ];
