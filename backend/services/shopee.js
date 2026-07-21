@@ -1,10 +1,12 @@
-const { getDatabase, getOne, getAll, runQuery } = require('../database/schema');
+const { getOne } = require('../database/schema');
 const { logInfo, logError } = require('../utils/helpers');
+const axios = require('axios');
 const crypto = require('crypto');
 
 class ShopeeService {
   constructor() {
-    this.baseUrl = 'https://open-api.affiliate.shopee.com.br/graphql';
+    this.graphqlUrl = 'https://open-api.affiliate.shopee.com.br/graphql';
+    this.searchUrl = 'https://shopee.com.br/api/v4/search/search_items';
   }
 
   async getConfig() {
@@ -21,14 +23,27 @@ class ShopeeService {
 
   async searchProducts(query, options = {}) {
     const { limit = 20 } = options;
+
+    // 1) Tentar API GraphQL (se configurada)
+    const apiResults = await this.searchViaGraphQL(query, limit);
+    if (apiResults.length > 0) return apiResults;
+
+    // 2) Tentar API pública de busca
+    const webResults = await this.searchViaWebAPI(query, limit);
+    if (webResults.length > 0) return webResults;
+
+    return [];
+  }
+
+  async searchViaGraphQL(query, limit) {
     try {
       const config = await this.getConfig();
-      
+
       if (!config.api_key || !config.api_secret) {
-        return this.simulateSearch(query, options);
+        await logInfo('[Shopee] API keys não configuradas. Configure shopee_api_key e shopee_api_secret.').catch(() => {});
+        return [];
       }
 
-      const axios = require('axios');
       const timestamp = Math.floor(Date.now() / 1000);
       const payload = JSON.stringify({
         query: `query {
@@ -61,7 +76,7 @@ class ShopeeService {
       );
 
       const response = await axios.post(
-        this.baseUrl,
+        this.graphqlUrl,
         payload,
         {
           headers: {
@@ -72,31 +87,88 @@ class ShopeeService {
         }
       );
 
-      return this.processResults(response.data, config);
+      const results = this.processGraphQLResults(response.data, config);
+      await logInfo(`[Shopee GraphQL] Busca "${query}": ${results.length} ofertas`).catch(() => {});
+      return results;
+
     } catch (err) {
-      await logError('[Shopee] Erro na busca', err.message);
-      return this.simulateSearch(query, options);
+      await logError('[Shopee GraphQL] Erro na busca', err.message).catch(() => {});
+      return [];
     }
   }
 
-  async simulateSearch(query, options = {}) {
-    const categorias = await getAll('SELECT id FROM categorias');
-    const randCategoria = categorias[Math.floor(Math.random() * categorias.length)];
-    const produtos = [
-      { nome: `${query} - Premium`, preco: 89.90 + Math.random() * 200, loja: 'Shopee Store' },
-      { nome: `${query} - Edição Especial`, preco: 49.90 + Math.random() * 150, loja: 'Ofertas Shopee' },
-      { nome: `${query} - Promoção`, preco: 29.90 + Math.random() * 100, loja: 'Shopee Mall' },
-    ];
-    return produtos.map(p => ({
-      produto: p.nome, preco_novo: p.preco.toFixed(2), preco_antigo: (p.preco * (1.3 + Math.random() * 0.5)).toFixed(2),
-      imagem: '', link_original: `https://shopee.com.br/search?keyword=${encodeURIComponent(query)}`,
-      plataforma: 'shopee', loja: p.loja, categoria_id: randCategoria?.id, desconto: Math.floor(15 + Math.random() * 40)
-    }));
+  async searchViaWebAPI(query, limit) {
+    try {
+      // API pública de busca da Shopee (não oficial, mas funciona)
+      const response = await axios.get(
+        `https://shopee.com.br/api/v4/search/search_items?by=relevancy&keyword=${encodeURIComponent(query)}&limit=${limit}&newest=0&order=desc&page_type=search`,
+        {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Accept': 'application/json',
+            'Referer': 'https://shopee.com.br/',
+          },
+          timeout: 15000
+        }
+      );
+
+      const config = await this.getConfig();
+      const results = [];
+
+      if (response.data && response.data.items) {
+        for (const item of response.data.items.slice(0, limit)) {
+          const itemBasic = item.item_basic;
+          if (!itemBasic) continue;
+
+          const preco_novo = (itemBasic.price || 0) / 100000;
+          const preco_antigo = (itemBasic.price_before_discount || itemBasic.price || 0) / 100000;
+
+          if (preco_novo <= 0) continue;
+          if (preco_antigo <= preco_novo) continue;
+
+          const discount = Math.round(((preco_antigo - preco_novo) / preco_antigo) * 100);
+          if (discount < 5) continue;
+
+          const itemId = itemBasic.itemid;
+          const shopId = itemBasic.shopid;
+          const link = `https://shopee.com.br/product/${shopId}/${itemId}`;
+
+          // Gerar link de afiliado se configurado
+          let link_afiliado = link;
+          if (config.affiliate_id) {
+            link_afiliado = `https://shopee.com.br/product/${shopId}/${itemId}?affiliate_id=${config.affiliate_id}`;
+          }
+
+          const imagem = `https://cf.shopee.com.br/file/${itemBasic.image}`;
+
+          results.push({
+            produto: itemBasic.name || '',
+            preco_novo,
+            preco_antigo,
+            imagem,
+            link_original: link,
+            link_afiliado,
+            plataforma: 'shopee',
+            loja: itemBasic.shop_name || 'Shopee',
+            desconto: discount,
+            vendidos: itemBasic.historical_sold || 0,
+            avaliacoes: itemBasic.item_rating?.rating_star || 0,
+          });
+        }
+      }
+
+      await logInfo(`[Shopee Web] Busca "${query}": ${results.length} ofertas`).catch(() => {});
+      return results;
+
+    } catch (err) {
+      await logError('[Shopee Web] Erro na busca', err.message).catch(() => {});
+      return [];
+    }
   }
 
   convertLink(originalUrl, affiliateId) {
     if (!affiliateId) return originalUrl;
-    
+
     try {
       const url = new URL(originalUrl);
       url.searchParams.set('affiliate_id', affiliateId);
@@ -107,7 +179,7 @@ class ShopeeService {
     }
   }
 
-  processResults(data, config) {
+  processGraphQLResults(data, config) {
     try {
       const nodes = data?.data?.productSearch?.nodes;
       if (!nodes || !Array.isArray(nodes) || nodes.length === 0) return [];
@@ -118,6 +190,7 @@ class ShopeeService {
         preco_antigo: this.parsePrice(item.priceBeforeDiscount || item.price),
         imagem: item.image || item.images?.[0] || '',
         link_original: item.affiliateUrl || item.url || item.link || '',
+        link_afiliado: item.affiliateUrl || '',
         plataforma: 'shopee',
         loja: item.shopName || item.shop?.name || 'Shopee',
         categoria_id: null,
@@ -126,51 +199,8 @@ class ShopeeService {
         avaliacoes: item.ratingStar || 0
       }));
     } catch (err) {
-      logError('[Shopee] Erro ao processar resultados', err.message);
+      logError('[Shopee] Erro ao processar resultados', err.message).catch(() => {});
       return [];
-    }
-  }
-
-  async generateShortLink(originalUrl, subIds = []) {
-    try {
-      const config = await this.getConfig();
-      if (!config.api_key || !config.api_secret) return originalUrl;
-
-      const axios = require('axios');
-      const timestamp = Math.floor(Date.now() / 1000);
-      const subIdParam = subIds.length > 0 ? `, subIds: [${subIds.map(s => `"${s}"`).join(', ')}]` : '';
-      
-      const payload = JSON.stringify({
-        query: `mutation {
-          generateShortLink(originUrl: "${originalUrl}"${subIdParam}) {
-            shortLink
-          }
-        }`
-      });
-
-      const signature = this.generateSignature(
-        config.api_key,
-        timestamp,
-        payload,
-        config.api_secret
-      );
-
-      const response = await axios.post(
-        this.baseUrl,
-        payload,
-        {
-          headers: {
-            'Authorization': `SHA256 Credential=${config.api_key}, Timestamp=${timestamp}, Signature=${signature}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 10000
-        }
-      );
-
-      return response.data?.data?.generateShortLink?.shortLink || originalUrl;
-    } catch (err) {
-      await logError('[Shopee] Erro ao gerar link curto', err.message);
-      return originalUrl;
     }
   }
 

@@ -14,8 +14,11 @@ class TelegramPublisher {
     const oldPrice = parseFloat(oferta.preco_antigo).toFixed(2);
     const newPrice = parseFloat(oferta.preco_novo).toFixed(2);
     const link = this.getLink(oferta);
+    const platformEmoji = oferta.plataforma === 'shopee' ? '🛒' : '🏪';
+    const platformName = oferta.plataforma === 'shopee' ? 'Shopee' : 'Mercado Livre';
     let msg = `🔥 *OFERTA IMPERDÍVEL*\n\n📦 *Produto:* ${oferta.produto}\n\n💸 De: R$ ${oldPrice}\n🔥 Por: R$ ${newPrice}\n📉 Desconto: ${oferta.desconto}%`;
-    if (oferta.loja) msg += `\n🏪 Loja: ${oferta.loja}`;
+    if (oferta.loja) msg += `\n${platformEmoji} Loja: ${oferta.loja}`;
+    msg += `\n🏪 Plataforma: ${platformName}`;
     msg += `\n\n🛒 *Comprar:*\n${link}\n\n⚠️ Promoção por tempo limitado.`;
     return msg;
   }

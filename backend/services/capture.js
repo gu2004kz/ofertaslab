@@ -3,7 +3,6 @@ const { logInfo, logError } = require('../utils/helpers');
 
 class DealCapture {
   constructor() {
-    this.shopeeService = require('./shopee');
     this.mlService = require('./mercadolivre');
     this.afiliadosService = require('./afiliados');
     this.pesquisasPadrao = [
@@ -52,41 +51,43 @@ class DealCapture {
     categorias.forEach(c => catMap[c.nome.toLowerCase()] = c.id);
 
     let novasOfertas = 0;
-    const maxSearches = Math.min(searches.length, 10);
+    let totalML = 0;
+    let totalFiltradas = 0;
+    const maxSearches = Math.min(searches.length, 5);
 
     for (let i = 0; i < maxSearches; i++) {
       const query = searches[i];
       try {
-        const shopeeResults = await this.shopeeService.searchProducts(query, { limit: 10, minPrice: precoMin, maxPrice: precoMax });
         const mlResults = await this.mlService.searchProducts(query, { limit: 10, minPrice: precoMin, maxPrice: precoMax });
+        totalML += mlResults.length;
 
-        for (const oferta of [...shopeeResults, ...mlResults]) {
+        for (const oferta of mlResults) {
           const precoAntigo = parseFloat(oferta.preco_antigo);
           const precoNovo = parseFloat(oferta.preco_novo);
           if (!precoAntigo || precoAntigo <= 0) continue;
           const desconto = Math.round(((precoAntigo - precoNovo) / precoAntigo) * 100);
-          if (desconto < descontoMin) continue;
-          if (precoNovo < precoMin || precoNovo > precoMax) continue;
+          if (desconto < descontoMin) { totalFiltradas++; continue; }
+          if (precoNovo < precoMin || precoNovo > precoMax) { totalFiltradas++; continue; }
 
-          const existe = await getOne('SELECT id FROM ofertas WHERE produto = $1 AND plataforma = $2', [oferta.produto, oferta.plataforma]);
-          if (existe) continue;
+          const existe = await getOne('SELECT id FROM ofertas WHERE produto = ? AND plataforma = ?', [oferta.produto, oferta.plataforma]);
+          if (existe) { totalFiltradas++; continue; }
 
           const link_afiliado = oferta.link_afiliado || await this.generateAffiliateLink(oferta.link_original, oferta.plataforma);
           const modo = await getOne("SELECT valor FROM configuracoes WHERE chave = 'modo_publicacao'");
           const status = modo?.valor === 'automatico' ? 'aprovada' : 'pendente';
 
-          const result = await runQuery(`INSERT INTO ofertas (produto, preco_antigo, preco_novo, desconto, link_original, link_afiliado, imagem, categoria_id, plataforma, loja, status, fonte) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+          const result = await runQuery(`INSERT INTO ofertas (produto, preco_antigo, preco_novo, desconto, link_original, link_afiliado, imagem, categoria_id, plataforma, loja, status, fonte) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [oferta.produto, precoAntigo, precoNovo, desconto, oferta.link_original, link_afiliado, oferta.imagem || '', oferta.categoria_id || null, oferta.plataforma, oferta.loja || '', status, 'auto']);
-          await runQuery('INSERT INTO historico_precos (oferta_id, preco) VALUES ($1, $2)', [result.lastInsertRowid, precoNovo]);
+          await runQuery('INSERT INTO historico_precos (oferta_id, preco) VALUES (?, ?)', [result.lastInsertRowid, precoNovo]);
           novasOfertas++;
         }
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise(r => setTimeout(r, 10000));
       } catch (err) {
         await logError(`[Capture] Erro na busca: ${query}`, err.message);
       }
     }
 
-    await logInfo(`[Capture] Captura concluída. ${novasOfertas} novas ofertas.`);
+    await logInfo(`[Capture] Captura concluida: ${novasOfertas} novas | ML: ${totalML} | Filtradas/duplicadas: ${totalFiltradas} | Buscas: ${maxSearches}`);
     return novasOfertas;
   }
 
@@ -96,35 +97,30 @@ class DealCapture {
 
     for (const oferta of ofertas) {
       try {
-        let resultados;
-        if (oferta.plataforma === 'shopee') {
-          resultados = await this.shopeeService.searchProducts(oferta.produto, { limit: 5 });
-        } else {
-          resultados = await this.mlService.searchProducts(oferta.produto, { limit: 5 });
-        }
+        const resultados = await this.mlService.searchProducts(oferta.produto, { limit: 5 });
         const match = resultados.find(r => r.produto === oferta.produto);
         if (match && parseFloat(match.preco_novo) < oferta.preco_novo) {
           const precoAntigo = parseFloat(match.preco_antigo);
           const precoNovo = parseFloat(match.preco_novo);
           const desconto = precoAntigo > 0 ? Math.round(((precoAntigo - precoNovo) / precoAntigo) * 100) : 0;
-          await runQuery('UPDATE ofertas SET preco_antigo=$1, preco_novo=$2, desconto=$3, atualizado_em=CURRENT_TIMESTAMP WHERE id=$4',
+          await runQuery('UPDATE ofertas SET preco_antigo=?, preco_novo=?, desconto=?, atualizado_em=CURRENT_TIMESTAMP WHERE id=?',
             [precoAntigo, precoNovo, desconto, oferta.id]);
-          await runQuery('INSERT INTO historico_precos (oferta_id, preco) VALUES ($1, $2)', [oferta.id, precoNovo]);
+          await runQuery('INSERT INTO historico_precos (oferta_id, preco) VALUES (?, ?)', [oferta.id, precoNovo]);
           atualizadas++;
         }
-        await new Promise(r => setTimeout(r, 1500));
+        await new Promise(r => setTimeout(r, 10000));
       } catch (err) {
         await logError(`[PriceDrop] Erro ao verificar: ${oferta.produto}`, err.message);
       }
     }
-    await logInfo(`[PriceDrop] ${atualizadas} ofertas com preço atualizado.`);
+    await logInfo(`[PriceDrop] ${atualizadas} ofertas com preco atualizado.`);
     return atualizadas;
   }
 
   async expireOldOffers() {
-    const result = await runQuery("UPDATE ofertas SET status = 'expirada', atualizado_em = CURRENT_TIMESTAMP WHERE status IN ('aprovada', 'publicada') AND publicada_em < NOW() - INTERVAL '30 days'");
+    const result = await runQuery("UPDATE ofertas SET status = 'expirada', atualizado_em = CURRENT_TIMESTAMP WHERE status IN ('aprovada', 'publicada') AND publicada_em < datetime('now', '-30 days')");
     if (result.changes > 0) {
-      await logInfo(`[Expira] ${result.changes} ofertas expiradas (>30 dias sem atualização)`);
+      await logInfo(`[Expira] ${result.changes} ofertas expiradas (>30 dias sem atualizacao)`);
     }
     return result.changes;
   }

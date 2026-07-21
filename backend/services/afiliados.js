@@ -27,7 +27,7 @@ class AfiliadosService {
 
     const config = {};
     for (const [key, configKey] of Object.entries(keys)) {
-      const row = await getOne("SELECT valor FROM configuracoes WHERE chave = $1", [configKey]);
+      const row = await getOne("SELECT valor FROM configuracoes WHERE chave = ?", [configKey]);
       config[key] = row?.valor || '';
     }
     return config;
@@ -53,8 +53,8 @@ class AfiliadosService {
     for (const [key, configKey] of Object.entries(keys)) {
       if (config[key] !== undefined) {
         await runQuery(
-          "INSERT INTO configuracoes (chave, valor, descricao) VALUES ($1, $2, $3) ON CONFLICT (chave) DO UPDATE SET valor = $2, atualizado_em = CURRENT_TIMESTAMP",
-          [configKey, config[key], `Configuração ${plataforma} - ${key}`]
+          "INSERT INTO configuracoes (chave, valor, descricao) VALUES (?, ?, ?) ON CONFLICT (chave) DO UPDATE SET valor = ?, atualizado_em = CURRENT_TIMESTAMP",
+          [configKey, config[key], `Configuração ${plataforma} - ${key}`, config[key]]
         );
       }
     }
@@ -68,19 +68,21 @@ class AfiliadosService {
       
       if (!affiliateId) {
         const afiliado = await getOne(
-          "SELECT affiliate_id FROM afiliados WHERE plataforma = $1 AND ativo = 1 ORDER BY id DESC LIMIT 1",
+          "SELECT affiliate_id FROM afiliados WHERE plataforma = ? AND ativo = 1 ORDER BY id DESC LIMIT 1",
           [plataforma]
         );
         affiliateId = afiliado?.affiliate_id;
       }
 
-      if (!affiliateId || plataforma === 'mercadolivre') {
+      if (!affiliateId && plataforma !== 'mercadolivre') {
         const config = await this.getConfig(plataforma);
         if (!affiliateId) affiliateId = config?.affiliate_id;
-        if (plataforma === 'mercadolivre') {
-          affiliateId = config?.matt_tool || affiliateId;
-          mattWord = config?.matt_word;
-        }
+      }
+
+      if (plataforma === 'mercadolivre') {
+        const config = await this.getConfig(plataforma);
+        if (!affiliateId) affiliateId = config?.matt_tool || config?.affiliate_id;
+        mattWord = config?.matt_word;
       }
 
       if (!affiliateId && !mattWord) return originalUrl;
@@ -88,12 +90,12 @@ class AfiliadosService {
       if (plataforma === 'shopee') {
         return this.shopeeService.convertLink(originalUrl, affiliateId);
       } else if (plataforma === 'mercadolivre') {
-        return this.mlService.convertLink(originalUrl, affiliateId, mattWord);
+        return this.mlService.convertLink(originalUrl, { matt_word: mattWord, matt_tool: affiliateId });
       }
 
       return originalUrl;
     } catch (err) {
-      await logError('[Afiliados] Erro ao gerar link', err.message);
+      await logError('[Afiliados] Erro ao gerar link', err.message).catch(() => {});
       return originalUrl;
     }
   }
@@ -189,8 +191,8 @@ class AfiliadosService {
     }
 
     const result = await runQuery(
-      `INSERT INTO afiliados (plataforma, conta, affiliate_id, api_key, api_secret, access_token, refresh_token) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+       `INSERT INTO afiliados (plataforma, conta, affiliate_id, api_key, api_secret, access_token, refresh_token) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [plataforma, conta, affiliate_id || '', api_key || '', api_secret || '', access_token || '', refresh_token || '']
     );
 
@@ -202,8 +204,8 @@ class AfiliadosService {
     const { plataforma, conta, affiliate_id, api_key, api_secret, access_token, refresh_token, ativo } = data;
     
     await runQuery(
-      `UPDATE afiliados SET plataforma=$1, conta=$2, affiliate_id=$3, api_key=$4, api_secret=$5, 
-       access_token=$6, refresh_token=$7, ativo=$8, atualizado_em=CURRENT_TIMESTAMP WHERE id=$9`,
+      `UPDATE afiliados SET plataforma=?, conta=?, affiliate_id=?, api_key=?, api_secret=?, 
+       access_token=?, refresh_token=?, ativo=?, atualizado_em=CURRENT_TIMESTAMP WHERE id=?`,
       [plataforma, conta, affiliate_id, api_key, api_secret, access_token, refresh_token, ativo !== undefined ? ativo : 1, id]
     );
 
@@ -212,7 +214,7 @@ class AfiliadosService {
   }
 
   async delete(id) {
-    await runQuery('DELETE FROM afiliados WHERE id = $1', [id]);
+    await runQuery('DELETE FROM afiliados WHERE id = ?', [id]);
     await logInfo(`[Afiliados] Afiliado ${id} removido`);
     return { message: 'Afiliado removido' };
   }

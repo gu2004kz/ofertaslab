@@ -1,10 +1,21 @@
-const { getDatabase, getOne, getAll, runQuery } = require('../database/schema');
+const { getOne } = require('../database/schema');
 const { logInfo, logError } = require('../utils/helpers');
+
+function getPuppeteer() {
+  try {
+    const pup = require('puppeteer-extra');
+    const stealth = require('puppeteer-extra-plugin-stealth');
+    pup.use(stealth());
+    return pup;
+  } catch (e) {
+    return require('puppeteer');
+  }
+}
 
 class MercadoLivreService {
   constructor() {
-    this.axios = require('axios');
-    this.cheerio = require('cheerio');
+    this.lastSearch = 0;
+    this.minInterval = 8000;
   }
 
   async getConfig() {
@@ -31,80 +42,143 @@ class MercadoLivreService {
     }
   }
 
+  async waitIfNeeded() {
+    const now = Date.now();
+    const elapsed = now - this.lastSearch;
+    if (elapsed < this.minInterval) {
+      await new Promise(r => setTimeout(r, this.minInterval - elapsed));
+    }
+    this.lastSearch = Date.now();
+  }
+
   async searchProducts(query, options = {}) {
     const { limit = 10 } = options;
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) {
+        await new Promise(r => setTimeout(r, 5000 + Math.random() * 5000));
+      }
+
+      const results = await this.searchViaPuppeteer(query, limit);
+      if (results.length > 0) return results;
+    }
+
+    return [];
+  }
+
+  async searchViaPuppeteer(query, limit) {
+    let browser = null;
     try {
-      const config = await this.getConfig();
+      await this.waitIfNeeded();
+
+      const pup = getPuppeteer();
+      const launchOptions = {
+        headless: 'new',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--window-size=1920,1080',
+        ]
+      };
+      if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+        launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+      }
+      browser = await pup.launch(launchOptions);
+
+      const page = await browser.newPage();
+
       const searchUrl = `https://lista.mercadolivre.com.br/${encodeURIComponent(query)}`;
-      
-      const response = await this.axios.get(searchUrl, {
-        timeout: 15000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
-        }
-      });
+      await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 30000 });
 
-      const $ = this.cheerio.load(response.data);
-      const results = [];
+      const currentUrl = page.url();
+      if (currentUrl.includes('account-verification') || currentUrl.includes('suspicious-traffic')) {
+        await browser.close();
+        return [];
+      }
 
-      $('li.ui-search-layout__item').each((i, el) => {
-        if (results.length >= limit) return false;
+      await new Promise(r => setTimeout(r, 4000));
 
-        const $el = $(el);
-        const titleEl = $el.find('h2.ui-search-item__title, a.ui-search-link__title-card');
-        const title = titleEl.text().trim();
-        if (!title) return;
+      const results = await page.evaluate((limit) => {
+        const items = [];
+        const productElements = document.querySelectorAll('li.ui-search-layout__item');
 
-        const linkEl = $el.find('a.ui-search-link, a.ui-search-item__group__element');
-        const link = linkEl.attr('href');
-        if (!link) return;
+        for (const el of productElements) {
+          if (items.length >= limit) break;
 
-        const priceWhole = $el.find('.andes-money-amount__fraction').first().text().trim().replace(/\./g, '');
-        const priceCents = $el.find('.andes-money-amount__cents').first().text().trim();
-        const price = priceCents ? parseFloat(`${priceWhole}.${priceCents}`) : parseFloat(priceWhole);
+          const title = el.querySelector('.poly-component__title')?.textContent?.trim();
+          if (!title) continue;
 
-        const originalPriceEl = $el.find('.andes-money-amount--previous .andes-money-amount__fraction').first();
-        const originalPrice = originalPriceEl.length ? parseFloat(originalPriceEl.text().trim().replace(/\./g, '')) : null;
+          const link = el.querySelector('a.poly-component__title')?.href;
+          if (!link) continue;
 
-        const imgEl = $el.find('img.ui-search-result-image__element');
-        let img = imgEl.attr('data-src') || imgEl.attr('src') || '';
-        if (img && !img.startsWith('https:')) img = 'https:' + img;
-        if (img) {
-          img = img.replace('http:', 'https:');
-          if (!img.includes('-O.') && !img.includes('-I.')) {
-            img = img.replace(/\.(jpg|jpeg|png)/i, '-O.$1');
+          const fractions = el.querySelectorAll('.andes-money-amount__fraction');
+          let currentPrice = null;
+          let originalPrice = null;
+
+          const prevPriceEl = el.querySelector('.andes-money-amount--previous .andes-money-amount__fraction');
+          if (prevPriceEl) {
+            originalPrice = parseFloat(prevPriceEl.textContent.trim().replace(/\./g, '').replace(/,/g, '.'));
+          }
+
+          const currentPriceEl = el.querySelector('.poly-price__current .andes-money-amount__fraction');
+          if (currentPriceEl) {
+            currentPrice = parseFloat(currentPriceEl.textContent.trim().replace(/\./g, '').replace(/,/g, '.'));
+          }
+
+          if (!currentPrice && fractions.length > 0) {
+            const allPrices = Array.from(fractions).map(f => parseFloat(f.textContent.trim().replace(/\./g, '').replace(/,/g, '.')));
+            if (allPrices.length >= 2) {
+              originalPrice = Math.max(...allPrices);
+              currentPrice = Math.min(...allPrices);
+            } else if (allPrices.length === 1) {
+              currentPrice = allPrices[0];
+            }
+          }
+
+          const img = el.querySelector('img.poly-component__picture')?.src || '';
+
+          if (currentPrice > 0 && title) {
+            items.push({ title, link, price: currentPrice, originalPrice: originalPrice || null, image: img.replace('http:', 'https:') });
           }
         }
+        return items;
+      }, limit);
 
-        const storeEl = $el.find('.ui-search-official-store-label, .ui-search-item__brand-discoverability');
-        const store = storeEl.text().trim() || 'Mercado Livre';
+      await browser.close();
+      browser = null;
 
-        if (price > 0 && originalPrice && originalPrice > price) {
-          const discount = Math.round(((originalPrice - price) / originalPrice) * 100);
-          const affiliateLink = this.convertLink(link, config);
+      const config = await this.getConfig();
+      const filteredResults = [];
 
-          results.push({
-            produto: title,
-            preco_novo: price,
-            preco_antigo: originalPrice,
-            imagem: img,
-            link_original: link,
+      for (const item of results) {
+        if (item.originalPrice && item.originalPrice > item.price && item.price > 0) {
+          const discount = Math.round(((item.originalPrice - item.price) / item.originalPrice) * 100);
+          const affiliateLink = this.convertLink(item.link, config);
+
+          filteredResults.push({
+            produto: item.title,
+            preco_novo: item.price,
+            preco_antigo: item.originalPrice,
+            imagem: item.image,
+            link_original: item.link,
             link_afiliado: affiliateLink,
             plataforma: 'mercadolivre',
-            loja: store,
+            loja: 'Mercado Livre',
             desconto: discount,
             vendidos: 0,
-            avaliacoes: 0
+            avaliacoes: 0,
           });
         }
-      });
+      }
 
-      await logInfo(`[ML] Busca "${query}": ${results.length} ofertas encontradas`);
-      return results;
+      await logInfo(`[ML] Busca "${query}": ${filteredResults.length} ofertas`).catch(() => {});
+      return filteredResults;
+
     } catch (err) {
-      await logError('[ML] Erro na busca', err.message);
+      await logError('[ML] Erro na busca', err.message).catch(() => {});
+      if (browser) { try { await browser.close(); } catch (e) {} }
       return [];
     }
   }

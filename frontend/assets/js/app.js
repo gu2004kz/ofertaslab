@@ -1,6 +1,8 @@
 const API = {
   token: localStorage.getItem('ofertaslab_token'),
-  baseUrl: 'https://ofertaslab.onrender.com',
+  baseUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? `http://localhost:${window.location.port || 3000}`
+    : window.location.origin,
 
   async request(url, options = {}) {
     const headers = { 'Content-Type': 'application/json', ...options.headers };
